@@ -1,6 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'dart:typed_data';
 
 import '../database/db_helper.dart';
 import '../models/device.dart';
@@ -111,11 +110,6 @@ class _DeviceListPageState extends State<DeviceListPage> {
             ),
           ),
                     IconButton(
-            tooltip: 'Impor Excel (xlsx)',
-            icon: const Icon(Icons.upload_file),
-            onPressed: () => _importExcel(context),
-          ),
-          IconButton(
             tooltip: 'Impor dari Excel',
             icon: const Icon(Icons.upload_file),
             onPressed: () => _importExcel(context),
@@ -288,18 +282,19 @@ class _DeviceListPageState extends State<DeviceListPage> {
   /// Impor file .xlsx -> tulis ke cloud Supabase (devices) + cache lokal
   /// sehingga WEB & APK memakai data impor ini sebagai default.
   Future<void> _importExcel(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final c = context.appColors;
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['xlsx'],
-        withData: true,
       );
-      final file = result?.files.single;
-      if (file == null || file.bytes == null) return;
-      final c = context.appColors;
-      final count = await DbHelper.instance.importExcelFile(file.bytes!);
+      final file = result.isEmpty ? null : result.first;
+      if (file == null) return;
+      final bytes = await file.xFile.readAsBytes();
+      final count = await DbHelper.instance.importExcelFile(bytes);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
+      messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(
           backgroundColor: c.accent,
@@ -311,12 +306,10 @@ class _DeviceListPageState extends State<DeviceListPage> {
     } catch (e) {
       debugPrintFallback('Gagal impor Excel: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
+      messenger
           .showSnackBar(SnackBar(content: Text('Gagal impor Excel: $e')));
     }
   }
-
-  int _sha1flag = 0;
 
   Widget _buildList(BuildContext context) {
     final c = context.appColors;
@@ -333,11 +326,67 @@ class _DeviceListPageState extends State<DeviceListPage> {
         ),
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 90),
-      itemCount: _filtered.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (ctx, i) => _card(context, _filtered[i]),
+    // Pengelompokan per kategori dengan garis pemisah + judul.
+    const order = <String>['Printer', 'Laptop', 'Computer'];
+    const labels = <String, String>{
+      'Printer': 'PRINTER',
+      'Laptop': 'LAPTOP',
+      'Computer': 'KOMPUTER',
+    };
+    final items = <Object>[];
+    for (final key in order) {
+      final group =
+          _filtered.where((d) => categoryKey(d.category) == key).toList();
+      if (group.isEmpty) continue;
+      items.add(_GroupHeader(key, labels[key]!, _iconFor(key), group.length));
+      items.addAll(group);
+    }
+    final known = order.toSet();
+    final others =
+        _filtered.where((d) => !known.contains(categoryKey(d.category))).toList();
+    if (others.isNotEmpty) {
+      items.add(const _GroupHeader('Lainnya', 'LAINNYA', Icons.devices_other, 0));
+      items.addAll(others);
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
+      itemCount: items.length,
+      itemBuilder: (ctx, i) {
+        final it = items[i];
+        if (it is _GroupHeader) {
+          return _groupHeader(ctx, it.label, it.icon, it.count);
+        }
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _card(context, it as Device),
+        );
+      },
+    );
+  }
+
+  Widget _groupHeader(
+      BuildContext context, String label, IconData icon, int count) {
+    final c = context.appColors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 16, 2, 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: c.blue),
+          const SizedBox(width: 6),
+          Text(label,
+              style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6)),
+          const SizedBox(width: 6),
+          Text('($count)',
+              style: TextStyle(color: c.textMuted, fontSize: 12)),
+          const SizedBox(width: 10),
+          Expanded(child: Divider(color: c.border, thickness: 1)),
+        ],
+      ),
     );
   }
 
@@ -443,7 +492,7 @@ class _DeviceListPageState extends State<DeviceListPage> {
   }
 
   Future<void> _openForm(Device? device) async {
-    final nextKode = device == null ? await _db.nextKode() : null;
+    final nextKode = null;
     if (!mounted) return;
     // Tambah data baru → pilih kategori dulu (Computer/Laptop/Printer),
     // lalu form terbuka dengan kategori terkunci. Edit → langsung ke form.
@@ -457,4 +506,12 @@ class _DeviceListPageState extends State<DeviceListPage> {
     );
     if (result == true) await _load();
   }
+}
+
+class _GroupHeader {
+  final String key;
+  final String label;
+  final IconData icon;
+  final int count;
+  const _GroupHeader(this.key, this.label, this.icon, this.count);
 }

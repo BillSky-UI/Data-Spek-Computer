@@ -58,7 +58,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   void initState() {
     super.initState();
     final d = widget.device;
-    _kode = TextEditingController(text: d?.kodeInventaris ?? widget.nextKode ?? '');
+    _kode = TextEditingController(
+        text: d?.kodeInventaris ?? widget.nextKode ?? '');
     _tanggal = TextEditingController(text: d?.tanggalEvaluasi ?? '');
     _plan = d?.plan ?? '';
     _bagian = d?.bagian ?? '';
@@ -66,6 +67,9 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     _category = d?.category.trim().isNotEmpty == true
         ? d!.category.trim()
         : (widget.category ?? 'Computer');
+    if (d == null && _kode.text.trim().isEmpty) {
+      _fillNextKode();
+    }
     _prosesor = TextEditingController(text: d?.prosesor ?? '');
     _motherboard = TextEditingController(text: d?.motherboard ?? '');
     _ram = TextEditingController(text: d?.ram ?? '');
@@ -87,6 +91,14 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         : 'Belum';
     _driveLink = TextEditingController(text: d?.driveLink ?? '');
     _loadMasters();
+  }
+
+  /// Isi kode inventaris otomatis per kategori (K-/L-/P-).
+  Future<void> _fillNextKode() async {
+    final cat = _category.isNotEmpty ? _category : (widget.category ?? 'Computer');
+    final next = await _db.nextKode(cat);
+    if (!mounted) return;
+    _kode.text = next;
   }
 
   Future<void> _loadMasters() async {
@@ -202,11 +214,29 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
           padding: const EdgeInsets.all(16),
           children: [
             _sectionTitle(context, 'INFORMASI PERANGKAT'),
-            _field(context, _kode, 'Kode Inventaris', 'K-XXX (otomatis jika kosong)'),
+            _lockedKode(context),
             _field(context, _tanggal, 'Tanggal Evaluasi', 'dd/mm/yyyy',
                 onTap: _pickDate, suffix: Icons.calendar_today),
-            _dropdown(context, label: 'PLAN', value: _plan, options: _planMaster,
-                onChanged: (v) => setState(() => _plan = v ?? ''), hint: 'Pilih PLAN'),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _dropdown(context,
+                      label: 'PLAN', value: _plan, options: _planMaster,
+                      onChanged: (v) => setState(() => _plan = v ?? ''),
+                      hint: 'Pilih PLAN'),
+                ),
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(top: 22),
+                  child: IconButton(
+                    tooltip: 'Tambah PLAN baru',
+                    icon: Icon(Icons.add_circle_outline, color: c.blue),
+                    onPressed: _showAddPlanDialog,
+                  ),
+                ),
+              ],
+            ),
             _dropdown(context, label: 'Bagian', value: _bagian, options: _bagianMaster,
                 onChanged: (v) => setState(() => _bagian = v ?? ''), hint: 'Pilih Bagian'),
             _field(context, _deviceName, 'Device Name *', 'Nama device / user',
@@ -217,7 +247,10 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
               _dropdown(context, label: 'Category',
                   value: _category,
                   options: _fixedOptions(_category, const ['Computer', 'Printer', 'Laptop']),
-                  onChanged: (v) => setState(() => _category = v ?? _category),
+                  onChanged: (v) {
+                    setState(() => _category = v ?? _category);
+                    if (!_isEdit) _fillNextKode();
+                  },
                   hint: 'Pilih Kategori'),
             _sectionTitle(context, _isPrinter ? 'DETAIL PRINTER' : 'SPECIFIKASI LENGKAP'),
             _field(context, _prosesor, labelFor('prosesor', _category),
@@ -225,14 +258,18 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                 maxLines: 3),
             _field(context, _motherboard, labelFor('motherboard', _category),
                 _isPrinter ? 'cth: USB + WiFi + LAN' : 'cth: H81M-K'),
+            if (!_isPrinter)
             _field(context, _ram, labelFor('ram', _category),
                 _isPrinter ? 'cth: 33 ppm monokrom' : 'cth: 16 GBytes'),
+            if (!_isPrinter)
             _field(context, _storage, labelFor('storage', _category),
                 _isPrinter ? 'cth: A4, tray 2 x 250 lembar' : 'Detail storage / disk',
                 maxLines: 3),
+            if (!_isPrinter)
             _field(context, _os, labelFor('osWindows', _category),
                 _isPrinter ? 'cth: Windows 10 / macOS / Linux' : 'cth: Windows 10 Pro',
                 maxLines: 2),
+            if (!_isPrinter)
             _field(context, _goal, labelFor('goal', _category),
                 _isPrinter ? 'cth: Tinta terisi' : 'cth: Tercapai'),
             _dropdown(context, label: labelFor('perluUpgradeGanti', _category),
@@ -309,6 +346,88 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   }
 
   /// Tampilan kategori terkunci (dari halaman pemilihan awal), bukan dropdown.
+  Future<void> _showAddPlanDialog() async {
+    final c = context.appColors;
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tambah PLAN Baru'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'cth: PLAN 1'),
+          style: TextStyle(color: c.textPrimary),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text),
+              child: const Text('Simpan')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result.trim().isEmpty) return;
+    final ok = await _db.addPlan(result);
+    if (!mounted) return;
+    if (ok) {
+      final list = await _db.getPlanMaster();
+      if (!mounted) return;
+      setState(() {
+        _planMaster = list;
+        _plan = result.trim();
+      });
+      final saved = result.trim();
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PLAN "' + saved + '" ditambahkan')));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal menambah PLAN')));
+    }
+  }
+
+  Widget _lockedKode(BuildContext context) {
+    final c = context.appColors;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Kode Inventaris',
+              style: TextStyle(color: c.textMuted, fontSize: 13)),
+          const SizedBox(height: 5),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: c.blue.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: c.blue.withValues(alpha: 0.45)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.confirmation_number_outlined, color: c.blue, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(_kode.text,
+                      style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700)),
+                ),
+                Icon(Icons.lock_outline, color: c.textMuted, size: 16),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text('Terisi otomatis per kategori dan tidak bisa diubah.',
+              style: TextStyle(color: c.textMuted, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
   Widget _lockedCategory(BuildContext context) {
     final c = context.appColors;
     final icon = _isPrinter

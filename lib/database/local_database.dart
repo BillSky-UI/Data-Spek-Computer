@@ -91,6 +91,8 @@ class LocalDatabase {
         name TEXT NOT NULL UNIQUE
       )
     ''');
+    await db.insert(_tablePlan, {'name': 'Sentul'},
+        conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   // ============================================================
@@ -179,11 +181,20 @@ class LocalDatabase {
     return Device.fromMap(rows.first);
   }
 
-  Future<String> nextKode() async {
+  static String _prefixFor(String category) {
+    final t = category.trim().toLowerCase();
+    if (t.contains('laptop')) return 'L';
+    if (t.contains('print')) return 'P';
+    return 'K';
+  }
+
+  Future<String> nextKode(String category) async {
+    final prefix = _prefixFor(category);
     final db = await database;
     final rows = await db.query(_tableDevices, columns: ['kode_inventaris']);
     var maxNum = 0;
-    final regex = RegExp(r'K-(\d+)', caseSensitive: false);
+    final regex = RegExp('^${RegExp.escape(prefix)}-(\\d+)',
+        caseSensitive: false);
     for (final r in rows) {
       final m = regex.firstMatch((r['kode_inventaris'] ?? '').toString());
       if (m != null) {
@@ -191,18 +202,21 @@ class LocalDatabase {
         if (n > maxNum) maxNum = n;
       }
     }
-    return 'K-${(maxNum + 1).toString().padLeft(3, '0')}';
+    return '$prefix-${(maxNum + 1).toString().padLeft(3, '0')}';
   }
 
   int _byKode(Device a, Device b) {
-    final ma =
-        RegExp(r'K-(\d+)', caseSensitive: false).firstMatch(a.kodeInventaris);
-    final mb =
-        RegExp(r'K-(\d+)', caseSensitive: false).firstMatch(b.kodeInventaris);
+    final ma = RegExp(r'^([KLP])-(\d+)', caseSensitive: false)
+        .firstMatch(a.kodeInventaris);
+    final mb = RegExp(r'^([KLP])-(\d+)', caseSensitive: false)
+        .firstMatch(b.kodeInventaris);
     if (ma != null && mb != null) {
-      final na = int.tryParse(ma.group(1)!) ?? 0;
-      final nb = int.tryParse(mb.group(1)!) ?? 0;
-      if (na != nb) return na.compareTo(nb);
+      final pa = ma.group(1)!.toUpperCase();
+      final pb = mb.group(1)!.toUpperCase();
+      if (pa != pb) return pa.compareTo(pb);
+      final na = int.tryParse(ma.group(2)!) ?? 0;
+      final nb = int.tryParse(mb.group(2)!) ?? 0;
+      return na.compareTo(nb);
     }
     return a.kodeInventaris.compareTo(b.kodeInventaris);
   }

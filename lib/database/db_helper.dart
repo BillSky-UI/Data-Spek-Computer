@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:excel/excel.dart' as excel_pkg;
 import 'package:flutter/foundation.dart';
@@ -286,13 +286,15 @@ class DbHelper extends ChangeNotifier {
     return null;
   }
 
-  Future<String> nextKode() async {
-    if (localMode) return LocalDatabase.instance.nextKode();
+  Future<String> nextKode(String category) async {
+    if (localMode) return LocalDatabase.instance.nextKode(category);
     if (_devices.isEmpty && _client != null) {
       await _fetchAll();
     }
+    final prefix = _prefixFor(category);
     var maxNum = 0;
-    final regex = RegExp(r'K-(\d+)', caseSensitive: false);
+    final regex =
+        RegExp('^${RegExp.escape(prefix)}-(\\d+)', caseSensitive: false);
     for (final d in _devices) {
       final m = regex.firstMatch(d.kodeInventaris);
       if (m != null) {
@@ -300,27 +302,48 @@ class DbHelper extends ChangeNotifier {
         if (n > maxNum) maxNum = n;
       }
     }
-    return 'K-${(maxNum + 1).toString().padLeft(3, '0')}';
+    return '$prefix-${(maxNum + 1).toString().padLeft(3, '0')}';
+  }
+
+  static String _prefixFor(String category) {
+    final t = category.trim().toLowerCase();
+    if (t.contains('laptop')) return 'L';
+    if (t.contains('print')) return 'P';
+    return 'K';
   }
 
   void _upsertLocal(Device d) {
-    final idx = _devices.indexWhere((x) => x.id == d.id);
+    var idx = -1;
+    if (d.id != null) {
+      idx = _devices.indexWhere((x) => x.id == d.id);
+    }
+    final key = _kodeKey(d.kodeInventaris);
+    if (idx < 0 && key.isNotEmpty) {
+      idx = _devices.indexWhere((x) => _kodeKey(x.kodeInventaris) == key);
+    }
     if (idx >= 0) {
-      _devices[idx] = d;
+      final old = _devices[idx];
+      _devices[idx] = d.id == null ? d.copyWith(id: old.id) : d;
     } else {
       _devices.add(d);
     }
     _devices.sort(_byKode);
   }
 
+  static String _kodeKey(String kode) =>
+      kode.trim().replaceAll(RegExp(r'\s+'), '').toLowerCase();
+
   int _byKode(Device a, Device b) {
     final ma =
-        RegExp(r'K-(\d+)', caseSensitive: false).firstMatch(a.kodeInventaris);
+        RegExp(r'^([KLP])-(\d+)', caseSensitive: false).firstMatch(a.kodeInventaris);
     final mb =
-        RegExp(r'K-(\d+)', caseSensitive: false).firstMatch(b.kodeInventaris);
+        RegExp(r'^([KLP])-(\d+)', caseSensitive: false).firstMatch(b.kodeInventaris);
     if (ma != null && mb != null) {
-      final na = int.tryParse(ma.group(1)!) ?? 0;
-      final nb = int.tryParse(mb.group(1)!) ?? 0;
+      final pa = ma.group(1)!.toUpperCase();
+      final pb = mb.group(1)!.toUpperCase();
+      if (pa != pb) return pa.compareTo(pb);
+      final na = int.tryParse(ma.group(2)!) ?? 0;
+      final nb = int.tryParse(mb.group(2)!) ?? 0;
       if (na != nb) return na.compareTo(nb);
     }
     return a.kodeInventaris.compareTo(b.kodeInventaris);
@@ -405,6 +428,26 @@ class DbHelper extends ChangeNotifier {
     if (id == null) return false;
     try {
       await _client!.from(_tBagian).delete().eq('id', id);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> addPlan(String name) async {
+    if (localMode) {
+      final ok = await LocalDatabase.instance.addPlan(name);
+      if (ok) {
+        await _reloadLocalCache();
+        notifyListeners();
+      }
+      return ok;
+    }
+    if (_client == null) return false;
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return false;
+    try {
+      await _client!.from(_tPlan).upsert({'name': trimmed}, onConflict: 'name');
       return true;
     } catch (_) {
       return false;
@@ -607,91 +650,166 @@ class DbHelper extends ChangeNotifier {
   //  3) upsert cache lokal -> sinkron di APK & web
   // ============================================================
 
+  /// Alias nama kolom (lowercase) untuk pencocokan saat impor.
+  /// Cocok bila sel header mengandung salah satu alias.
+  static const _importAliases = <String, List<String>>{
+    'tanggalEvaluasi': ['tanggal evalu'],
+    'kodeInventaris': ['kode inventaris'],
+    'plan': ['plan'],
+    'bagian': ['bagian'],
+    'deviceName': ['device name', 'nama device'],
+    'category': ['category', 'kategori'],
+    'prosesor': ['prosesor', 'processor', 'cpu'],
+    'motherboard': ['motherboard', 'mother board'],
+    'ram': ['ram'],
+    'storage': ['storage', 'penyimpanan'],
+    'osWindows': ['os windows', 'sistem operasi'],
+    'goal': ['goal'],
+    'ganti': ['perlu upgrade ganti', 'ganti'],
+    'repair': ['perlu upgrade repair', 'repair', 'perbaikan'],
+    'statusUpgrade': ['status upgrade'],
+    'keterangan': ['keterangan', 'catatan'],
+    'statusStiker': ['status stiker', 'stiker'],
+  };
+
+  /// Baca SELURUH sheet pada file .xlsx hasil ekspor aplikasi.
+  ///
+  /// Ekspor menulis kop + 2 baris header (utama dan sub-header) lalu data, dan
+  /// memisahkan kategori ke sheet Computer/Laptop/Printer. Parser mencari baris
+  /// header secara otomatis, menggabungkan baris utama dengan sub-header, lalu
+  /// membaca data di bawahnya.
   Future<List<Device>> parseExcelBytes(Uint8List bytes) async {
     if (bytes.isEmpty) return const [];
     try {
       final excel = excel_pkg.Excel.decodeBytes(bytes);
-      final sheetName = excel.tables.keys.firstWhere(
-        (k) => k.toLowerCase() == _sheetName.toLowerCase(),
-        orElse: () => excel.tables.keys.first,
-      );
-      final sheet = excel.tables[sheetName];
-      if (sheet == null) return const [];
-      final rows = sheet.rows;
-      if (rows.isEmpty) return const [];
-
-      final header = rows.first
-          .map((c) =>
-              _cellString(c).toLowerCase().replaceAll(RegExp(r'\s+'), ' '))
-          .toList();
-
-      int findCol(String sub) {
-        final parts = sub.split(' ');
-        return header.indexWhere((h) => parts.every((p) => h.contains(p)));
+      final out = <Device>[];
+      for (final entry in excel.tables.entries) {
+        final sheet = entry.value;
+        out.addAll(_parseSheet(sheet, entry.key));
       }
-
-      final c = <String, int>{};
-      final map = {
-        'tanggalEvaluasi': 'tanggal evaluasi',
-        'kodeInventaris': 'kode inventaris',
-        'plan': 'plan',
-        'bagian': 'bagian',
-        'deviceName': 'device name',
-        'category': 'category',
-        'prosesor': 'prosesor',
-        'motherboard': 'motherboard',
-        'ram': 'ram',
-        'storage': 'storage',
-        'osWindows': 'os windows',
-        'goal': 'goal',
-        'ganti': 'perlu upgrade ganti',
-        'repair': 'perlu upgrade repair',
-        'statusUpgrade': 'status upgrade',
-        'keterangan': 'keterangan',
-        'statusStiker': 'status stiker',
-      };
-      map.forEach((key, sub) {
-        final i = findCol(sub as String);
-        if (i >= 0) c[key as String] = i;
-      });
-
-      String val(int ci, int ri) {
-        if (ci < 0 || ci >= c.length || ri >= rows.length) return '';
-        final row = rows[ri];
-        if (ci >= row.length) return '';
-        return _cellString(row[ci]);
-      }
-
-      final result = <Device>[];
-      for (int ri = 1; ri < rows.length; ri++) {
-        final row = rows[ri];
-        final isEmptyRow = row.every((cl) => _cellString(cl).trim().isEmpty);
-        if (isEmptyRow) continue;
-        result.add(Device(
-          kodeInventaris: val(c['kodeInventaris']!, ri),
-          tanggalEvaluasi: val(c['tanggalEvaluasi']! , ri),
-          plan: val(c['plan']!, ri),
-          bagian: val(c['bagian']!, ri),
-          deviceName: val(c['deviceName']!, ri),
-          category: val(c['category']!, ri),
-          prosesor: val(c['prosesor']!, ri),
-          motherboard: val(c['motherboard']!, ri),
-          ram: val(c['ram']!, ri),
-          storage: val(c['storage']!, ri),
-          osWindows: val(c['osWindows']!, ri),
-          goal: val(c['goal']!, ri),
-          perluUpgradeGanti: val(c['ganti']!, ri),
-          perluUpgradeRepair: val(c['repair']! , ri),
-          statusUpgrade: val(c['statusUpgrade']!, ri),
-          keterangan: val(c['keterangan']!, ri),
-          statusStiker: val(c['statusStiker']!, ri),
-        ));
-      }
-      return result;
+      return out;
     } catch (e) {
       debugPrintFallback('Gagal membaca Excel impor: $e');
       return const [];
     }
+  }
+
+  List<Device> _parseSheet(excel_pkg.Sheet sheet, String sheetName) {
+    final rows = sheet.rows;
+    if (rows.isEmpty) return const <Device>[];
+
+    String cellAt(int rowIdx, int colIdx) {
+      if (rowIdx < 0 || rowIdx >= rows.length) return '';
+      final row = rows[rowIdx];
+      if (colIdx < 0 || colIdx >= row.length) return '';
+      return _cellString(row[colIdx]).trim();
+    }
+
+    final allAliases =
+        _importAliases.values.expand((e) => e).toList(growable: false);
+
+    // 1) Baris header = baris dengan pencocokan alias terbanyak.
+    var headerRow = -1;
+    var bestScore = 0;
+    for (var r = 0; r < rows.length && r < 30; r++) {
+      var score = 0;
+      for (final entry in _importAliases.entries) {
+        for (var ci = 0; ci < 30; ci++) {
+          final v = cellAt(r, ci).toLowerCase();
+          if (v.isNotEmpty && entry.value.any((a) => v.contains(a))) {
+            score++;
+            break;
+          }
+        }
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        headerRow = r;
+      }
+    }
+    if (headerRow < 0 || bestScore < 3) return const <Device>[];
+
+    // 2) Header logis: baris utama digabung dengan sub-header di bawahnya.
+    final width = rows[headerRow].length;
+    final logical = List<String>.filled(width, '');
+    for (var ci = 0; ci < width; ci++) {
+      final a = cellAt(headerRow, ci).toLowerCase();
+      final b = cellAt(headerRow + 1, ci).toLowerCase();
+      logical[ci] = b.isNotEmpty ? '$a $b' : a;
+    }
+
+    final col = <String, int>{};
+    for (final entry in _importAliases.entries) {
+      for (var ci = 0; ci < width; ci++) {
+        if (entry.value.any((a) => logical[ci].contains(a))) {
+          col[entry.key] = ci;
+          break;
+        }
+      }
+    }
+    if (col.isEmpty) return const <Device>[];
+
+    String val(String key, int rowIdx) => cellAt(rowIdx, col[key] ?? -1);
+
+    // 3) Baris data berada di bawah header dan sub-header.
+    final result = <Device>[];
+    for (var r = headerRow + 1; r < rows.length; r++) {
+      var any = false;
+      for (var ci = 0; ci < width; ci++) {
+        if (cellAt(r, ci).isNotEmpty) {
+          any = true;
+          break;
+        }
+      }
+      if (!any) continue;
+
+      if (r == headerRow + 1) {
+        // Lewati baris sub-header bila isinya hanya nama kolom.
+        final vals = <String>[];
+        for (var ci = 0; ci < width; ci++) {
+          final v = cellAt(r, ci).toLowerCase();
+          if (v.isNotEmpty) vals.add(v);
+        }
+        final headerish =
+            vals.isNotEmpty && vals.every((v) => allAliases.any((a) => v.contains(a)));
+        if (headerish) continue;
+      }
+
+      final kode = val('kodeInventaris', r);
+      final nama = val('deviceName', r);
+      if (kode.isEmpty) continue;
+      var kat = val('category', r);
+      if (kat.isEmpty) kat = _categoryFromSheet(sheetName);
+
+      result.add(Device(
+        kodeInventaris: kode,
+        tanggalEvaluasi: val('tanggalEvaluasi', r),
+        plan: val('plan', r),
+        bagian: val('bagian', r),
+        deviceName: nama,
+        category: kat,
+        prosesor: val('prosesor', r),
+        motherboard: val('motherboard', r),
+        ram: val('ram', r),
+        storage: val('storage', r),
+        osWindows: val('osWindows', r),
+        goal: val('goal', r),
+        perluUpgradeGanti: val('ganti', r),
+        perluUpgradeRepair: val('repair', r),
+        statusUpgrade: val('statusUpgrade', r),
+        keterangan: val('keterangan', r),
+        statusStiker: val('statusStiker', r),
+      ));
+    }
+    return result;
+  }
+
+  String _categoryFromSheet(String sheetName) {
+    final t = sheetName.trim().toLowerCase();
+    if (t.contains('laptop')) return 'Laptop';
+    if (t.contains('print')) return 'Printer';
+    if (t.contains('computer')) return 'Computer';
+    return '';
   }
 
   /// Impor file .xlsx pilihan user ke cloud (Supabase) + cache lokal.
@@ -707,46 +825,44 @@ class DbHelper extends ChangeNotifier {
       debugPrintFallback('Excel impor kosong / kolom tidak dikenali.');
       return 0;
     }
-    if (_client != null) {
+    if (localMode) {
+      for (final d in data) {
+        if (_kodeKey(d.kodeInventaris).isEmpty) continue;
+        final existing =
+            await LocalDatabase.instance.getByKode(d.kodeInventaris);
+        if (existing != null && existing.id != null) {
+          await LocalDatabase.instance.update(d.copyWith(id: existing.id));
+        } else {
+          await LocalDatabase.instance.insert(d);
+        }
+      }
+      await _reloadLocalCache();
+    } else if (_client != null) {
+      var savedToCloud = false;
       try {
         await _client!.from(_tDevices).upsert(
-              data.map((d) => ({...d.toMap()}..remove('id'))).toList(),
+              data
+                  .where((d) => _kodeKey(d.kodeInventaris).isNotEmpty)
+                  .map((d) => ({...d.toMap()}..remove('id')))
+                  .toList(),
               onConflict: 'kode_inventaris',
             );
+        savedToCloud = true;
       } catch (e) {
         debugPrintFallback('Cloud impor gagal, simpan lokal saja: $e');
       }
+      if (savedToCloud) {
+        await _fetchAll();
+      } else {
+        for (final d in data) {
+          _upsertLocal(d);
+        }
+      }
+    } else {
+      for (final d in data) {
+        _upsertLocal(d);
+      }
     }
-    for (final d in data) {
-      _upsertLocal(d);
-    }
-    await _ensureMastersFromDevices();
-    notifyListeners();
-    return data.length;
-  }
-  Future<List<Device>> loadExcelSeed() async {
-    final ByteData b = await rootBundle.load(_assetExcel);
-    final Uint8List bytes = b.buffer.asUint8List(
-      b.offsetInBytes,
-      b.lengthInBytes,
-    );
-
-    final excel = excel_pkg.Excel.decodeBytes(bytes);
-    final sheet = excel.tables[_sheetName];
-    if (sheet == null) return [];
-
-    final rows = sheet.rows;
-    if (rows.isEmpty) return [];
-
-    final header = rows.first
-        .map((c) => _cellString(c).toLowerCase().replaceAll(RegExp(r'\s+'), ' '))
-        .toList();
-
-    int colIndex(String sub) {
-      final parts = sub.split(' ');
-      return header.indexWhere((h) => parts.every(h.contains));
-    }
-
     int getCol(String key) {
       const map = {
         'tanggalEvaluasi': 'tanggal evaluasi',

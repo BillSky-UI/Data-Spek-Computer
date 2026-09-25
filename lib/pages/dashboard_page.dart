@@ -574,7 +574,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // ---------- CRUD ----------
   Future<void> _openForm(Device? device) async {
-    final nextKode = device == null ? await _db.nextKode() : null;
+    final nextKode = null;
     if (!mounted) return;
     // Tambah data baru → pilih kategori dulu (Computer/Laptop/Printer),
     // lalu form terbuka dengan kategori terkunci. Edit → langsung ke form.

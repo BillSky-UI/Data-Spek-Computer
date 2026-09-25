@@ -248,8 +248,101 @@ class AppTheme {
   static ThemeData dark() => _build(AppColors.dark, Brightness.dark);
   static ThemeData light() => _build(AppColors.light, Brightness.light);
 
+  /// Radius sudut seragam di seluruh komponen.
+  static const double radius = 14;
+
+  /// Gaya border dasar (untuk input & dropdown).
+  static OutlineInputBorder inputBorder(Color color) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: color),
+      );
+
+  /// Skala tipografi yang dipakai tema (label, judul, isi).
+  static TextTheme buildTextTheme(AppColors colors) => Typography
+      .material2021(platform: TargetPlatform.android)
+      .black
+      .apply(
+        bodyColor: colors.textPrimary,
+        displayColor: colors.textPrimary,
+      )
+      .copyWith(
+        titleLarge: TextStyle(
+          color: colors.textPrimary,
+          fontSize: 21,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.3,
+        ),
+        titleMedium: TextStyle(
+          color: colors.textPrimary,
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+        ),
+        titleSmall: TextStyle(
+          color: colors.textPrimary,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        bodyLarge: TextStyle(color: colors.textPrimary, fontSize: 15),
+        bodyMedium: TextStyle(color: colors.textMuted, fontSize: 14, height: 1.35),
+        bodySmall: TextStyle(color: colors.textMuted, fontSize: 12),
+        labelLarge: TextStyle(
+          color: colors.textPrimary,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        labelMedium: TextStyle(
+          color: colors.textMuted,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+
+  /// Provider warna tombol saat ditekan (partial-opacity hover/pressed).
+  static WidgetStateProperty<Color?> accentOn(Color accent) =>
+      WidgetStateProperty.resolveWith((states) =>
+          states.contains(WidgetState.pressed)
+              ? accent.withValues(alpha: 0.6)
+              : accent);
+
   static ThemeData _build(AppColors colors, Brightness brightness) {
     final isDark = brightness == Brightness.dark;
+    final radius = 14.0;
+    final textTheme = Typography.material2021(platform: TargetPlatform.android)
+        .black
+        .apply(
+          bodyColor: colors.textPrimary,
+          displayColor: colors.textPrimary,
+        )
+        .copyWith(
+          titleLarge: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.2,
+          ),
+          titleMedium: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+          bodyLarge: TextStyle(color: colors.textPrimary, fontSize: 15),
+          bodyMedium: TextStyle(color: colors.textMuted, fontSize: 14, height: 1.4),
+          labelLarge: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        );
+
+    final inputBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: colors.border),
+    );
+
+    WidgetStateProperty<Color?> accentOn(Color c) =>
+        WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.pressed) ? c.withValues(alpha: 0.4) : c);
+
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
@@ -267,31 +360,141 @@ class AppTheme {
       ),
       scaffoldBackgroundColor: colors.background,
       extensions: [colors],
+      textTheme: textTheme,
+      visualDensity: VisualDensity.standard,
+      splashFactory: InkSparkle.splashFactory,
       appBarTheme: AppBarTheme(
         backgroundColor: colors.surface,
         foregroundColor: colors.textPrimary,
         elevation: 0,
+        scrolledUnderElevation: 1,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+          color: colors.textPrimary,
+          fontSize: 19,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: colors.surface,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
+          side: BorderSide(color: colors.border),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: colors.surfaceAlt,
+        selectedColor: colors.planChipBg,
+        labelStyle: TextStyle(color: colors.textPrimary, fontSize: 13),
+        side: BorderSide(color: colors.border),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      ),
+      dividerTheme: DividerThemeData(color: colors.border, thickness: 1),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: colors.accent,
+          foregroundColor: colors.onAccent,
+          minimumSize: const Size(0, 46),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: colors.textPrimary,
+          minimumSize: const Size(0, 46),
+          textStyle: TextStyle(
+              fontSize: 15, fontWeight: FontWeight.w600, color: colors.textPrimary),
+          side: BorderSide(color: colors.border),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: colors.blue),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: colors.surface,
+        hintStyle: TextStyle(color: colors.inputHint, fontSize: 14),
+        labelStyle: TextStyle(color: colors.textMuted),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        border: inputBorder,
+        enabledBorder: inputBorder,
+        focusedBorder: inputBorder.copyWith(
+          borderSide: BorderSide(color: colors.accent, width: 1.6),
+        ),
+        errorBorder: inputBorder.copyWith(
+          borderSide: BorderSide(color: colors.danger),
+        ),
+        focusedErrorBorder: inputBorder.copyWith(
+          borderSide: BorderSide(color: colors.danger, width: 1.6),
+        ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: colors.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: colors.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFF0F172A),
+        backgroundColor: isDark
+            ? const Color(0xFF334155)
+            : const Color(0xFF0F172A),
         contentTextStyle: TextStyle(color: colors.textPrimary),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: colors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       dropdownMenuTheme: DropdownMenuThemeData(
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: colors.surface,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: colors.border),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: colors.border),
+          border: inputBorder,
+          enabledBorder: inputBorder,
+          focusedBorder: inputBorder.copyWith(
+            borderSide: BorderSide(color: colors.accent, width: 1.6),
           ),
         ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: accentOn(colors.accent),
+        trackColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? colors.accent.withValues(alpha: 0.85)
+                : colors.surfaceAlt),
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: colors.accent),
+      listTileTheme: ListTileThemeData(
+        iconColor: colors.textMuted,
+        textColor: colors.textPrimary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      iconTheme: IconThemeData(color: colors.textMuted),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {TargetPlatform.windows: FadeForwardsPageTransitionsBuilder()},
       ),
     );
   }
