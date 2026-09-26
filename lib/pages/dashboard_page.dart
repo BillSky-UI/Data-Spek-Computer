@@ -76,21 +76,28 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _load() async {
     final devices = await _db.getAll();
+    // Master dipakai juga supaya plan/bagian yang baru ditambahkan langsung
+    // muncul di totalan dan dropdown walau belum ada perangkatnya.
+    final bagianMaster = await _db.getBagianMaster();
+    final planMaster = await _db.getPlanMaster();
     if (!mounted) return;
     setState(() {
       _all = devices;
-      _bagianList =
-          devices.map((d) => d.bagian).where((b) => b.trim().isNotEmpty).toSet().toList()
-            ..sort();
-      _planList = devices
-          .map((d) => d.plan)
-          .where((p) => p.trim().isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
+      _bagianList = _mergeNames(bagianMaster, devices.map((d) => d.bagian));
+      _planList = _mergeNames(planMaster, devices.map((d) => d.plan));
       _applyFilters();
       _loading = false;
     });
+  }
+
+  /// Gabungkan daftar master dengan nilai yang dipakai perangkat.
+  List<String> _mergeNames(List<String> master, Iterable<String> used) {
+    final out = <String>{};
+    for (final n in [...master, ...used]) {
+      final t = n.trim();
+      if (t.isNotEmpty) out.add(t);
+    }
+    return out.toList()..sort();
   }
 
   void _applyFilters() {

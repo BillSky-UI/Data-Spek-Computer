@@ -327,11 +327,11 @@ class _DeviceListPageState extends State<DeviceListPage> {
       );
     }
     // Pengelompokan per kategori dengan garis pemisah + judul.
-    const order = <String>['Printer', 'Laptop', 'Computer'];
+    const order = <String>['Computer', 'Printer', 'Laptop'];
     const labels = <String, String>{
+      'Computer': 'KOMPUTER',
       'Printer': 'PRINTER',
       'Laptop': 'LAPTOP',
-      'Computer': 'KOMPUTER',
     };
     final items = <Object>[];
     for (final key in order) {

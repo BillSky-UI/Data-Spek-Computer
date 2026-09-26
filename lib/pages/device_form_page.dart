@@ -217,26 +217,12 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
             _lockedKode(context),
             _field(context, _tanggal, 'Tanggal Evaluasi', 'dd/mm/yyyy',
                 onTap: _pickDate, suffix: Icons.calendar_today),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _dropdown(context,
-                      label: 'PLAN', value: _plan, options: _planMaster,
-                      onChanged: (v) => setState(() => _plan = v ?? ''),
-                      hint: 'Pilih PLAN'),
-                ),
-                const SizedBox(width: 8),
-                Padding(
-                  padding: const EdgeInsets.only(top: 22),
-                  child: IconButton(
-                    tooltip: 'Tambah PLAN baru',
-                    icon: Icon(Icons.add_circle_outline, color: c.blue),
-                    onPressed: _showAddPlanDialog,
-                  ),
-                ),
-              ],
-            ),
+            _dropdown(context,
+                label: 'PLAN',
+                value: _plan,
+                options: _planMaster,
+                onChanged: (v) => setState(() => _plan = v ?? ''),
+                hint: 'Pilih PLAN'),
             _dropdown(context, label: 'Bagian', value: _bagian, options: _bagianMaster,
                 onChanged: (v) => setState(() => _bagian = v ?? ''), hint: 'Pilih Bagian'),
             _field(context, _deviceName, 'Device Name *', 'Nama device / user',
@@ -345,49 +331,6 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     );
   }
 
-  /// Tampilan kategori terkunci (dari halaman pemilihan awal), bukan dropdown.
-  Future<void> _showAddPlanDialog() async {
-    final c = context.appColors;
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Tambah PLAN Baru'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'cth: PLAN 1'),
-          style: TextStyle(color: c.textPrimary),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, controller.text),
-              child: const Text('Simpan')),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (result == null || result.trim().isEmpty) return;
-    final ok = await _db.addPlan(result);
-    if (!mounted) return;
-    if (ok) {
-      final list = await _db.getPlanMaster();
-      if (!mounted) return;
-      setState(() {
-        _planMaster = list;
-        _plan = result.trim();
-      });
-      final saved = result.trim();
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PLAN "' + saved + '" ditambahkan')));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal menambah PLAN')));
-    }
-  }
-
   Widget _lockedKode(BuildContext context) {
     final c = context.appColors;
     return Padding(
@@ -428,6 +371,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     );
   }
 
+  /// Tampilan kategori terkunci (dari halaman pemilihan awal), bukan dropdown.
   Widget _lockedCategory(BuildContext context) {
     final c = context.appColors;
     final icon = _isPrinter

@@ -174,6 +174,21 @@ class DbHelper extends ChangeNotifier {
         .toList()
       ..sort();
 
+    // Plan master diambil dari tabel plan, bukan hanya dari perangkat,
+    // supaya plan yang belum dipakai perangkat tetap ikut terhitung.
+    try {
+      final planRows = await _client!.from(_tPlan).select(
+        'name',
+      );
+      _planMaster = planRows
+          .map((r) => (r['name'] ?? '').toString())
+          .where((n) => n.trim().isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+    } catch (_) {
+      // tabel plan belum tersedia -> andalkan plan dari perangkat
+    }
     _derivePlanMaster();
 
     final setRows = await _client!
@@ -187,12 +202,13 @@ class DbHelper extends ChangeNotifier {
   }
 
   void _derivePlanMaster() {
-    _planMaster = _devices
-        .map((d) => d.plan)
-        .where((p) => p.trim().isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
+    // Plan manual (ditambah user) tetap dipertahankan, digabung dengan
+    // plan yang benar-benar dipakai perangkat.
+    final all = <String>{
+      ..._planMaster.where((p) => p.trim().isNotEmpty),
+      ..._devices.map((d) => d.plan).where((p) => p.trim().isNotEmpty),
+    };
+    _planMaster = all.toList()..sort();
   }
 
   @override
@@ -378,6 +394,10 @@ class DbHelper extends ChangeNotifier {
       await _client!
           .from(_tBagian)
           .upsert({'name': trimmed}, onConflict: 'name');
+      if (!_bagianMaster.contains(trimmed)) {
+        _bagianMaster = [..._bagianMaster, trimmed]..sort();
+      }
+      notifyListeners();
       return true;
     } catch (_) {
       return false;
@@ -448,6 +468,10 @@ class DbHelper extends ChangeNotifier {
     if (trimmed.isEmpty) return false;
     try {
       await _client!.from(_tPlan).upsert({'name': trimmed}, onConflict: 'name');
+      if (!_planMaster.contains(trimmed)) {
+        _planMaster = [..._planMaster, trimmed]..sort();
+      }
+      notifyListeners();
       return true;
     } catch (_) {
       return false;
@@ -461,6 +485,52 @@ class DbHelper extends ChangeNotifier {
     }
     if (_planMaster.isEmpty && _client != null) await _fetchAll();
     return List.of(_planMaster);
+  }
+
+  Future<bool> updatePlan(String oldName, String newName) async {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) return false;
+    if (localMode) {
+      final ok = await LocalDatabase.instance.updatePlan(oldName, trimmed);
+      if (ok) {
+        await _reloadLocalCache();
+        notifyListeners();
+      }
+      return ok;
+    }
+    if (_client == null) return false;
+    try {
+      await _client!.from(_tPlan).update({'name': trimmed}).eq('name', oldName);
+      _planMaster = _planMaster
+          .map((p) => p == oldName ? trimmed : p)
+          .toSet()
+          .toList()
+        ..sort();
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> deletePlan(String name) async {
+    if (localMode) {
+      final ok = await LocalDatabase.instance.deletePlan(name);
+      if (ok) {
+        await _reloadLocalCache();
+        notifyListeners();
+      }
+      return ok;
+    }
+    if (_client == null) return false;
+    try {
+      await _client!.from(_tPlan).delete().eq('name', name);
+      _planMaster = _planMaster.where((p) => p != name).toList();
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<List<String>> distinctBagian() async {
@@ -863,6 +933,34 @@ class DbHelper extends ChangeNotifier {
         _upsertLocal(d);
       }
     }
+    await _ensureMastersFromDevices();
+    notifyListeners();
+    return data.length;
+  }
+
+  Future<List<Device>> loadExcelSeed() async {
+    final ByteData b = await rootBundle.load(_assetExcel);
+    final Uint8List bytes = b.buffer.asUint8List(
+      b.offsetInBytes,
+      b.lengthInBytes,
+    );
+
+    final excel = excel_pkg.Excel.decodeBytes(bytes);
+    final sheet = excel.tables[_sheetName];
+    if (sheet == null) return [];
+
+    final rows = sheet.rows;
+    if (rows.isEmpty) return [];
+
+    final header = rows.first
+        .map((c) => _cellString(c).toLowerCase().replaceAll(RegExp(r'\s+'), ' '))
+        .toList();
+
+    int colIndex(String sub) {
+      final parts = sub.split(' ');
+      return header.indexWhere((h) => parts.every(h.contains));
+    }
+
     int getCol(String key) {
       const map = {
         'tanggalEvaluasi': 'tanggal evaluasi',

@@ -285,6 +285,22 @@ class LocalDatabase {
     }
   }
 
+  Future<bool> updatePlan(String oldName, String newName) async {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) return false;
+    final db = await database;
+    final n = await db.update(_tablePlan, {'name': trimmed},
+        where: 'name = ?', whereArgs: [oldName]);
+    return n > 0;
+  }
+
+  Future<bool> deletePlan(String name) async {
+    final db = await database;
+    final n =
+        await db.delete(_tablePlan, where: 'name = ?', whereArgs: [name]);
+    return n > 0;
+  }
+
   Future<List<String>> getPlanMaster() async {
     final db = await database;
     final rows = await db.query(_tablePlan, orderBy: 'name COLLATE NOCASE ASC');
