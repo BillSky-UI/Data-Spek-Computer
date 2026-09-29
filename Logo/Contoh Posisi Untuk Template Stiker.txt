@@ -1,0 +1,13 @@
+		Inventaris & Spesifikasi
+
+Inventaris : Dekstop	Divisi : IT	No.Dok : FRM-06/SOP-001-IT
+Kode : K-001		PJ : Eky	Tgl Brlk : 20/10/2025
+
+		Perangkat Keras/Hardware
+
+No	Sub-unit		Merek Dan Spesifikasi Komponen
+1	Mainboard		Asus H610
+2	Processor(CPU)		Intel Core i7-12700KF
+3	Ram			32 GB DDR4
+4	Memory			-
+5	SSD			256 GB SSD Sata

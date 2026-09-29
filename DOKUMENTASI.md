@@ -1,6 +1,6 @@
 # Dokumentasi Aplikasi Inventaris Spek Komputer (DPR)
 
-Versi Aplikasi : **2.0.0 (build 3)**
+Versi Aplikasi : **3.5.1 (build 6)**
 Nama Paket : `spek_komputer`
 Judul di Layar : **Spek Inventaris DPR**
 Perusahaan : **PT. DWI PRIMA REZEKY - IT**
@@ -72,7 +72,7 @@ yang membuat satu kode Dart dapat dijalankan di Android, iOS, maupun Web.
 
 - **Flutter SDK** dengan Dart `^3.13.2` (dari `pubspec.yaml`).
 - **Android minSdk 21** (Android 5.0 Lollipop ke atas).
-- Versi aplikasi: `2.0.0+3`.
+- Versi aplikasi: `3.5.1+6` (versionName `3.5.1`, versionCode `6`).
 
 ---
 
@@ -105,7 +105,7 @@ lib/
 │   └── scan_page.dart            # Scanner QR / barcode
 ├── services/
 │   ├── export_service.dart       # Ekspor Excel multi-sheet & CSV
-│   ├── sticker_pdf_service.dart  # PDF stiker 157×63 mm
+│   ├── sticker_pdf_service.dart  # PDF stiker 15,5×6 cm
 │   ├── detail_sheet_pdf_service.dart # Helper PDF
 │   ├── barcode_export_service.dart # Barcode & QR
 │   ├── pin_controller.dart       # Hash & verifikasi PIN
@@ -285,7 +285,7 @@ Jika tidak ada data yang cocok, muncul pesan **"Tidak ada data yang cocok"**.
 | Status Upgrade | Dropdown | `Complated` / `Pending` |
 | Keterangan | Teks (3 baris) | Catatan bebas |
 | Status Stiker | Dropdown | `Sudah` / `Belum` |
-| Link Google Drive | URL (opsional) | Di-encode ke dalam QR pada stiker |
+| Link Google Drive | URL (opsional) | Di-encode ke QR pada menu Download Barcode |
 
 4. Tekan **Simpan** (atau **Simpan Perubahan** saat edit).
 5. Data langsung muncul di Dashboard dan Daftar Perangkat.
@@ -315,15 +315,18 @@ Jika tidak ada data yang cocok, muncul pesan **"Tidak ada data yang cocok"**.
 |---|---|---|
 | **Download Barcode** | Barcode + QR, siap cetak jadi stiker | **PNG** |
 | **Preview & Download PDF Spesifikasi** | Dokumen teks spesifikasi lengkap, ada preview | **A4 PDF** |
-| **Download Stiker (Template)** | Stiker inventaris + spesifikasi + barcode & QR | **PDF 157 × 63 mm** |
+| **Download Stiker (Template)** | Stiker inventaris + spesifikasi perangkat keras | **PDF 15,5 × 6 cm** |
 
 - Pada dialog stiker/barcode ada tombol **Download** dan **Bagikan** (kirim ke WhatsApp/dll).
-- **Stiker berisi** QR yang, jika `PUBLIC_BASE_URL` dikonfigurasi, mengarah ke halaman web publik
-  (`?kode=K-001`); jika tidak, QR berisi kode inventaris langsung (tetap bisa discan scanner internal).
-- **Link Google Drive** yang diisi pada device di-encode ke QR sehingga stiker bisa membuka
-  file spesifikasi di Drive.
-- Ukuran asli di kode PDF adalah **157 × 63 mm** (landscape). Label di antarmuka saat ini menulis
-  "157 × 83 mm" — dilengkapi koreksi bila diperlukan.
+- **Stiker PDF tidak memuat barcode maupun QR** — isinya hanya judul, 2 baris identitas,
+  sub-header, dan tabel perangkat keras. Butuh kode pindai? Gunakan menu **Download Barcode**
+  (PNG) yang sudah tersedia terpisah.
+- Ukuran kertas stiker adalah **15,5 × 6 cm** (landscape). Posisi absolut semua elemen
+  (`pw.Stack` + `pw.Positioned`) diukur dari `Logo/Template Stiker.pdf` (ruang desain
+  157 × 63 mm), lalu diperkecil seragam dengan faktor 0,9524 agar muat di kertas 15,5 × 6 cm
+  tanpa meregangkan logo maupun garis. Tata letak tidak bergeser meskipun isi data
+  berbeda-beda. Huruf dikecilkan otomatis bila teks terlalu lebar untuk kolomnya
+  (batas bawah 5 pt) supaya kode inventaris panjang tetap tercetak utuh.
 
 ### 6.8 Tab 2 — Dashboard
 
@@ -385,7 +388,7 @@ Dua baris yang bisa dibuka-tutup (chevron). **Tertutup secara default** agar tam
 - Setelah selesai, muncul notifikasi lokasi file tersimpan.
 
 #### Informasi Aplikasi
-- Nama Aplikasi, Versi (`V2.0.0 (build 3)`), Basis Data aktif, dan keterangan Data Awal.
+- Nama Aplikasi, Versi (`V3.5.1 (build 6)`), Basis Data aktif, dan keterangan Data Awal.
 
 ### 6.10 Tentang Aplikasi
 Dialog berisi nama, versi, dan deskripsi singkat; tombol **Tutup** untuk keluar.
@@ -465,7 +468,7 @@ Ketuk device → lihat Detail
    ↓
 Tambah baru → + Tambah Data → pilih kategori → isi form → Simpan
    ↓
-Scan QR stiker → langsung ke Detail
+Scan QR (dari Barcode PNG / label QR) → langsung ke Detail
    ↓
 Dashboard → cek statistik → ketuk varian → lihat device
    ↓
@@ -496,13 +499,14 @@ flutter build apk --release \
   --dart-define=SUPABASE_ANON_KEY=eyJhbGciOi...
 ```
 
-### 9.4 Opsional — QR Stiker Menunjuk Halaman Web Publik
+### 9.4 Opsional — QR (Barcode PNG) Menunjuk Halaman Web Publik
 ```bash
 flutter build apk --release \
   --dart-define=PUBLIC_BASE_URL=https://nama-proyek.netlify.app
 ```
-Jika diisi, QR pada stiker menjadi `https://nama-proyek.netlify.app?kode=K-001`, sehingga kamera
-HP biasa langsung membuka halaman detail tanpa perlu instal aplikasi.
+Jika diisi, QR pada **Download Barcode** menjadi `https://nama-proyek.netlify.app?kode=K-001`,
+sehingga kamera HP biasa langsung membuka halaman detail tanpa perlu instal aplikasi.
+(Prioritas target QR: `Link Google Drive` → `PUBLIC_BASE_URL?kode=...` → kode inventaris.)
 
 ### 9.5 Build Web (PWA)
 ```bash
@@ -551,7 +555,7 @@ inventaris dari file Excel ke `data/inventory.json`. Jalankan dengan `npm start`
 | **PLAN** | Program/Keggiaan kerja yang menjadi acuan perangkat. |
 | **Bagian** | Unit kerja / divisi pemilik perangkat. |
 | **Master Data** | Daftar acuan yang dipakai berulang di form (kode, plan, bagian). |
-| **Stiker** | Label kecil berisi identitas + barcode/QR untuk ditempel di perangkat. |
+| **Stiker** | Label kecil berisi identitas + spesifikasi perangkat keras (tanpa barcode/QR). |
 | **Seed** | Pengisian awal data dari file Excel saat database kosong. |
 | **Upsert** | Menyisipkan data baru, atau memperbarui bila Kode Inventaris sudah ada. |
 | **Cache** | Salinan data di memori agar aplikasi cepat tanpa perlu unduhan ulang. |
@@ -563,12 +567,12 @@ inventaris dari file Excel ke `data/inventory.json`. Jalankan dengan `npm start`
 ## 12. Ringkasan Singkat untuk Dijawab Saat Wawancara / Ujian
 
 > Aplikasi **Inventaris Spek Komputer DPR** dibuat dengan **bahasa Dart** menggunakan
-> **framework Flutter** (versi 2.0.0+3). Data disimpan di **SQLite** (`sqflite`) untuk mode
+> **framework Flutter** (versi 3.5.1+6). Data disimpan di **SQLite** (`sqflite`) untuk mode
 > offline dan disinkronkan ke **Supabase (PostgreSQL)** untuk mode cloud. Aplikasi dapat berjalan
 > di **Android, iOS, dan Web (PWA)** dari satu basis kode. Fitur utamanya: inventaris perangkat
 > (Computer/Laptop/Printer) dengan master data **PLAN** dan **Bagian**, dashboard statistik
 > spesifikasi, scanner QR/barcode, serta pembuatan **barcode PNG, PDF A4, dan stiker PDF
-> 157×63 mm**. Ekspor ke **Excel multi-sheet** (3 sheet) dan **CSV**; impor membaca seluruh sheet
+> 15,5×6 cm**. Ekspor ke **Excel multi-sheet** (3 sheet) dan **CSV**; impor membaca seluruh sheet
 > secara toleran. Keamanan menggunakan **PIN yang di-hash SHA-256**. Kode inventaris dibuat
 > otomatis berawalan **K / L / P** dengan nomor 3 digit. Seluruh kode lolos `dart analyze` (No
-> issues) dan 19 pengujian otomatis.
+> issues) dan 31 pengujian otomatis.

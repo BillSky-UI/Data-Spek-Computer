@@ -50,14 +50,19 @@ class PrintOptionsSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Cetak / Download',
-                style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700)),
+            Text(
+              'Cetak / Download',
+              style: TextStyle(
+                color: c.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text('Pilih dokumen yang ingin diunduh untuk perangkat ini.',
-                style: TextStyle(color: c.textMuted, fontSize: 12)),
+            Text(
+              'Pilih dokumen yang ingin diunduh untuk perangkat ini.',
+              style: TextStyle(color: c.textMuted, fontSize: 12),
+            ),
             const SizedBox(height: 12),
             _option(
               context,
@@ -75,8 +80,7 @@ class PrintOptionsSheet extends StatelessWidget {
               icon: Icons.picture_as_pdf_outlined,
               color: c.dangerFg,
               title: 'Preview & Download PDF Spesifikasi',
-              subtitle:
-                  'Teks spesifikasi lengkap perangkat (tanpa barcode), format A4',
+              subtitle: 'Teks spesifikasi lengkap perangkat (tanpa barcode), format A4',
               onTap: () => _openPdf(context),
             ),
             const SizedBox(height: 10),
@@ -85,7 +89,7 @@ class PrintOptionsSheet extends StatelessWidget {
               icon: Icons.sticky_note_2_outlined,
               color: c.blue,
               title: 'Download Stiker (Template)',
-              subtitle: 'Stiker inventaris + spesifikasi perangkat (dengan barcode & QR), format 157 x 83 mm',
+              subtitle: 'Stiker inventaris + spesifikasi perangkat (tanpa barcode & QR), format 15,5 x 6 cm',
               onTap: () => _openSticker(context),
             ),
           ],
@@ -94,12 +98,14 @@ class PrintOptionsSheet extends StatelessWidget {
     );
   }
 
-  Widget _option(BuildContext context,
-      {required IconData icon,
-      required Color color,
-      required String title,
-      required String subtitle,
-      required VoidCallback onTap}) {
+  Widget _option(
+    BuildContext context, {
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
     final c = context.appColors;
     return Material(
       color: c.surfaceAlt,
@@ -130,15 +136,23 @@ class PrintOptionsSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title,
-                        style: TextStyle(
-                            color: c.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700)),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(subtitle,
-                        style: TextStyle(
-                            color: c.textMuted, fontSize: 11.5, height: 1.3)),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: c.textMuted,
+                        fontSize: 11.5,
+                        height: 1.3,
+                      ),
+                    ),
                   ],
                 ),
               ),

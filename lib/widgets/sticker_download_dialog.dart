@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
@@ -10,7 +9,7 @@ import '../theme/app_theme.dart';
 
 /// Dialog "Download Stiker PDF (Template)".
 ///
-/// Membangun PDF stiker 157x63mm persis mengikuti
+/// Membangun PDF stiker 15,5 x 6 cm persis mengikuti
 /// `Logo/Template Stiker.pdf` lalu menyimpannya ke folder Download
 /// publik (atau membagikannya).
 class StickerDownloadDialog extends StatefulWidget {
@@ -35,13 +34,19 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
     setState(() => _busy = true);
     try {
       final bytes = await _build();
-      final target = await PublicSaverService.instance
-          .savePdfToDownloads(bytes, _fileName);
+      final target = await PublicSaverService.instance.savePdfToDownloads(
+        bytes,
+        _fileName,
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Stiker PDF tersimpan di ${target.location}: ${target.path}'),
-        backgroundColor: const Color(0xFF166534),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Stiker PDF tersimpan di ${target.location}: ${target.path}',
+          ),
+          backgroundColor: const Color(0xFF166534),
+        ),
+      );
     } catch (e) {
       _toast('Gagal mengunduh stiker: $e');
     } finally {
@@ -55,21 +60,29 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
       final bytes = await _build();
       final name = _fileName;
       if (kIsWeb) {
-        final target = await PublicSaverService.instance
-            .savePdfToDownloads(bytes, name);
+        final target = await PublicSaverService.instance.savePdfToDownloads(
+          bytes,
+          name,
+        );
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Stiker PDF tersimpan di ${target.location}: ${target.path}'),
-          backgroundColor: const Color(0xFF166534),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Stiker PDF tersimpan di ${target.location}: ${target.path}',
+            ),
+            backgroundColor: const Color(0xFF166534),
+          ),
+        );
       } else {
-        await SharePlus.instance.share(ShareParams(
-          files: [
-            XFile.fromData(bytes, mimeType: 'application/pdf', name: name)
-          ],
-          subject: 'Stiker ${_d.kodeInventaris}',
-          text: 'Stiker PDF ${_d.kodeInventaris} - ${_d.deviceName}',
-        ));
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [
+              XFile.fromData(bytes, mimeType: 'application/pdf', name: name),
+            ],
+            subject: 'Stiker ${_d.kodeInventaris}',
+            text: 'Stiker PDF ${_d.kodeInventaris} - ${_d.deviceName}',
+          ),
+        );
       }
     } catch (e) {
       _toast('Gagal membagikan stiker: $e');
@@ -80,8 +93,7 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
 
   void _toast(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -109,16 +121,22 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
                       borderRadius: BorderRadius.circular(11),
                     ),
                     alignment: Alignment.center,
-                    child: Icon(Icons.sticky_note_2_outlined,
-                        color: c.blue, size: 22),
+                    child: Icon(
+                      Icons.sticky_note_2_outlined,
+                      color: c.blue,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text('Download Stiker PDF (Template)',
-                        style: TextStyle(
-                            color: c.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700)),
+                    child: Text(
+                      'Download Stiker PDF (Template)',
+                      style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                   IconButton(
                     visualDensity: VisualDensity.compact,
@@ -139,29 +157,36 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_d.kodeInventaris,
-                        style: TextStyle(
-                            color: c.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1)),
+                    Text(
+                      _d.kodeInventaris,
+                      style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
+                    ),
                     const SizedBox(height: 2),
                     Text(
-                        _d.deviceName.trim().isEmpty
-                            ? 'Tanpa nama'
-                            : _d.deviceName.trim(),
-                        style: TextStyle(color: c.textMuted, fontSize: 12)),
+                      _d.deviceName.trim().isEmpty
+                          ? 'Tanpa nama'
+                          : _d.deviceName.trim(),
+                      style: TextStyle(color: c.textMuted, fontSize: 12),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 10),
               Text(
-                'PDF stiker 157x63mm (landscape) persis mengikuti '
+                'PDF stiker 15,5 x 6 cm (landscape) persis mengikuti '
                 '"Template Stiker" (INVENTARIS & SPESIFIKASI, '
-                'FRM-06/SOP-001-IT): grid identitas, tabel perangkat '
-                'keras (Mainboard/CPU/RAM/Memory/SSD), plus Code128 + QR '
-                'berisi link spesifikasi perangkat.',
-                style: TextStyle(color: c.textMuted, fontSize: 11, height: 1.35),
+                'FRM-06/SOP-001-IT): grid identitas dan tabel perangkat '
+                'keras (Mainboard/CPU/RAM/Memory/SSD).',
+                style: TextStyle(
+                  color: c.textMuted,
+                  fontSize: 11,
+                  height: 1.35,
+                ),
               ),
               const SizedBox(height: 12),
               Row(
@@ -170,14 +195,17 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
                     child: OutlinedButton.icon(
                       onPressed: _busy ? null : _share,
                       icon: const Icon(Icons.share, size: 18),
-                      label: const Text('Bagikan',
-                          style: TextStyle(color: Color(0xFF1565C0))),
+                      label: const Text(
+                        'Bagikan',
+                        style: TextStyle(color: Color(0xFF1565C0)),
+                      ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF1565C0),
                         side: const BorderSide(color: Color(0xFF1565C0)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(11)),
+                          borderRadius: BorderRadius.circular(11),
+                        ),
                       ),
                     ),
                   ),
@@ -189,17 +217,20 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
                           ? const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2))
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : const Icon(Icons.download, size: 18),
-                      label: const Text('Download PDF',
-                          style: TextStyle(color: Colors.white)),
+                      label: const Text(
+                        'Download PDF',
+                        style: TextStyle(color: Colors.white),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1565C0),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(11)),
+                          borderRadius: BorderRadius.circular(11),
+                        ),
                       ),
                     ),
                   ),
