@@ -6,12 +6,15 @@ import '../models/device.dart';
 import '../services/public_saver_service.dart';
 import '../services/sticker_pdf_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/field_groups.dart';
 
 /// Dialog "Download Stiker PDF (Template)".
 ///
-/// Membangun PDF stiker 15,5 x 6 cm persis mengikuti
-/// `Logo/Template Stiker.pdf` lalu menyimpannya ke folder Download
-/// publik (atau membagikannya).
+/// Membangun PDF stiker sesuai kategori perangkat:
+/// - Printer -> label 7,6 x 3,8 cm (`Logo/Label Inventaris Kantor.pdf`);
+/// - lainnya -> stiker 15,5 x 6 cm (`Logo/Template Stiker.pdf`).
+///
+/// Hasilnya disimpan ke folder Download publik (atau dibagikan).
 class StickerDownloadDialog extends StatefulWidget {
   final Device device;
   const StickerDownloadDialog({super.key, required this.device});
@@ -29,6 +32,18 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
   String get _fileName => 'Stiker_$_safeKode.pdf';
 
   Future<Uint8List> _build() => StickerPdfService.instance.buildSticker(_d);
+
+  /// Keterangan label sesuai desain yang dipakai kategori ini.
+  String get _deskripsi => _isPrinter
+      ? 'PDF label printer 7,6 x 3,8 cm persis mengikuti '
+        '"Label Inventaris Kantor": Nama Barang (Tipe/Model), Bagian, '
+        'Nama PIC, Kode Unit, dan Keterangan.'
+      : 'PDF stiker 15,5 x 6 cm (landscape) persis mengikuti '
+        '"Template Stiker" (INVENTARIS & SPESIFIKASI, '
+        'FRM-06/SOP-001-IT): grid identitas dan tabel perangkat '
+        'keras (Mainboard/CPU/RAM/Memory/SSD).';
+
+  bool get _isPrinter => categoryKey(_d.category) == 'Printer';
 
   Future<void> _download() async {
     setState(() => _busy = true);
@@ -178,10 +193,7 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
               ),
               const SizedBox(height: 10),
               Text(
-                'PDF stiker 15,5 x 6 cm (landscape) persis mengikuti '
-                '"Template Stiker" (INVENTARIS & SPESIFIKASI, '
-                'FRM-06/SOP-001-IT): grid identitas dan tabel perangkat '
-                'keras (Mainboard/CPU/RAM/Memory/SSD).',
+                _deskripsi,
                 style: TextStyle(
                   color: c.textMuted,
                   fontSize: 11,

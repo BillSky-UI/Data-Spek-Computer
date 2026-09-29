@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 3.6.2+9
+version: 3.7.0+12
 
 environment:
   sdk: ^3.13.2
@@ -86,8 +86,18 @@ flutter:
     # Subdirektori harus disebut eksplisit; entri direktori saja tidak
     # selalu ikut ter-bundle (logo stiker ada di assets/img/).
     - assets/
+    - assets/fonts/
     - assets/icon/
     - assets/img/
+
+  # Carlito = klon open-source yang metrik & tampilannya identik dengan
+  # Calibri (font proprietary Microsoft). Dipakai untuk teks stiker printer
+  # supaya hurufnya sama dengan desain `Logo/Label Inventaris Kantor.pdf`.
+  fonts:
+    - family: Carlito
+      fonts:
+        - asset: assets/fonts/Carlito-Bold.ttf
+          weight: 700
 
 # Konfigurasi ikon aplikasi (logo) — generate otomatis dengan:
 #   dart run flutter_launcher_icons

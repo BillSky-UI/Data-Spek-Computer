@@ -333,17 +333,34 @@ Jika tidak ada data yang cocok, muncul pesan **"Tidak ada data yang cocok"**.
 | Opsi                                       | Hasil                                              | Format              |
 | ------------------------------------------ | -------------------------------------------------- | ------------------- |
 | **Download Barcode**                       | Barcode + QR, siap cetak jadi stiker               | **PNG**             |
-| **Preview &amp; Download PDF Spesifikasi** | Dokumen teks spesifikasi lengkap, ada preview      | **A4 PDF**          |
-| **Download Stiker (Template)**             | Stiker inventaris + spesifikasi + barcode &amp; QR | **PDF 157 × 63 mm** |
+| **Preview & Download PDF Spesifikasi**     | Dokumen teks spesifikasi lengkap, ada preview      | **A4 PDF**          |
+| **Download Stiker (Template)**             | Stiker inventaris + spesifikasi perangkat keras    | **PDF 15,5 × 6 cm** (printer: **7,6 × 3,8 cm**) |
 
 
 - Pada dialog stiker/barcode ada tombol **Download** dan **Bagikan** (kirim ke WhatsApp/dll).
-- **Stiker berisi** QR yang, jika `PUBLIC_BASE_URL` dikonfigurasi, mengarah ke halaman web publik  
-(`?kode=K-001`); jika tidak, QR berisi kode inventaris langsung (tetap bisa discan scanner internal).
-- **Link Google Drive** yang diisi pada device di-encode ke QR sehingga stiker bisa membuka  
-file spesifikasi di Drive.
-- Ukuran asli di kode PDF adalah **157 × 63 mm** (landscape). Label di antarmuka saat ini menulis  
-"157 × 83 mm" — dilengkapi koreksi bila diperlukan.
+- **Stiker PDF tidak memuat barcode maupun QR** — isinya identitas + spesifikasi perangkat keras.
+  Butuh kode pindai? Gunakan menu **Download Barcode** (PNG) yang tersedia terpisah, berisi QR
+  yang mengarah ke halaman web publik bila `PUBLIC_BASE_URL` dikonfigurasi (`?kode=K-001`), atau
+  berisi kode inventaris langsung bila tidak.
+- Desain stiker dipilih otomatis dari kategori perangkat:
+
+  | Kategori | Desain | Kertas |
+  | --- | --- | --- |
+  | Computer / Laptop | `Logo/Template Stiker.pdf` | 15,5 × 6 cm |
+  | Printer | `Logo/Label Inventaris Kantor.pdf` | 7,6 × 3,8 cm |
+
+- **Stiker printer** memakai gambar desain asli sebagai latar penuh
+  (`assets/img/stiker_printer_bg.jpg`, 898 × 449 px) sehingga logo, garis bingkai, dan tulisan
+  label identik dengan desain; yang digambar ulang hanya nilainya: Nama Barang (Tipe/Model),
+  Bagian, Nama PIC, Kode Unit, dan Keterangan.
+- **Link Google Drive** yang diisi pada device tidak ikut dicetak pada stiker PDF, tapi tetap
+  di-encode ke QR pada menu Download Barcode.
+- Posisi absolut semua elemen (`pw.Stack` + `pw.Positioned`) diukur dari masing-masing file PDF
+  desain lalu dikonversi ke milimeter, sehingga tata letak tidak bergeser meskipun isi data
+  berbeda-beda. Huruf dikecilkan otomatis bila teks melebihi lebar kolomnya.
+- Kedua stiker dibangun di isolate latar (`compute`) dengan aset gambar di-cache, sehingga
+  unduhan tidak membekukan UI.
+
 
 ### 6.8 Tab 2 — Dashboard
 

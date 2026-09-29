@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart' as excel_pkg;
+import 'package:flutter/foundation.dart' show compute;
 
 import '../models/device.dart';
 import '../utils/field_groups.dart';
@@ -81,7 +82,7 @@ class ExportService {
     'Status Stiker',
   ];
 
-  List<String> _values(Device d) => [
+  static List<String> _values(Device d) => [
         d.tanggalEvaluasi,
         d.kodeInventaris,
         d.plan,
@@ -102,7 +103,7 @@ class ExportService {
       ];
 
   /// Kelompokkan perangkat ke sheet sesuai kategori.
-  Map<String, List<Device>> _groupBy(List<Device> devices) {
+  static Map<String, List<Device>> _groupBy(List<Device> devices) {
     final map = <String, List<Device>>{
       for (final s in _sheetOrder) s: <Device>[],
     };
@@ -113,7 +114,7 @@ class ExportService {
   }
 
   Future<SavedTarget> saveExcelToDownloads(List<Device> devices) async {
-    final bytes = buildExcelBytes(devices);
+    final bytes = await buildExcelBytesAsync(devices);
     final name = 'Spek_Inventaris_DPR_${_timestamp()}.xlsx';
     return PublicSaverService.instance.saveFileToDownloads(
       bytes,
@@ -124,15 +125,27 @@ class ExportService {
 
   /// Simpan file .csv ke folder Download publik HP (MediaStore).
   Future<SavedTarget> saveCsvToDownloads(List<Device> devices) async {
-    final bytes = buildCsvBytes(devices);
+    final bytes = await compute(_buildCsv, devices);
     final name = 'Spek_Inventaris_DPR_${_timestamp()}.csv';
     return PublicSaverService.instance.saveFileToDownloads(
         bytes, name, 'text/csv');
   }
 
-  /// Bangun file `.xlsx` multi-sheet:
+  /// Versi async [buildExcelBytes] yang jalan di isolate latar.
+  ///
+  /// Pembuatan .xlsx butuh ~0,7 detik untuk 1.000 baris dan ~3 detik untuk
+  /// 5.000 baris. Kalau sinkron, UI thread akan membeku dan Android dapat
+  /// menampilkan dialog "isn't responding".
+  Future<Uint8List> buildExcelBytesAsync(List<Device> devices) =>
+      compute(_buildExcel, devices);
+
+  /// Bangun file `.xlsx` multi-sheet secara sinkron.
+  ///
   /// Sheet Computer, Laptop, Printer — masing-masing dengan kop.
-  Uint8List buildExcelBytes(List<Device> devices) {
+  /// Untuk pemakaian dari UI, prefer [buildExcelBytesAsync].
+  Uint8List buildExcelBytes(List<Device> devices) => _buildExcel(devices);
+
+  static Uint8List _buildExcel(List<Device> devices) {
     final excel = excel_pkg.Excel.createExcel();
     final grouped = _groupBy(devices);
     final periode = 'Tahun ${DateTime.now().year}';
@@ -151,7 +164,7 @@ class ExportService {
 
   // ---------- Layout tiap sheet ----------
 
-  void _buildSheet(excel_pkg.Sheet sheet, String category, String periode,
+  static void _buildSheet(excel_pkg.Sheet sheet, String category, String periode,
       List<Device> devices) {
     final rows = _rowsFor(category, periode, devices);
     for (final row in rows) {
@@ -162,7 +175,7 @@ class ExportService {
 
   /// Susun baris mentah (kop + header 2 baris + data). Nilai diisi sebagai
   /// string; null = kosong. Data dimulai dari kolom 1 (B) seperti master.
-  List<List<String?>> _rowsFor(
+  static List<List<String?>> _rowsFor(
       String category, String periode, List<Device> devices) {
     final rows = <List<String?>>[
       List<String?>.filled(18, null), // R0 spacer
@@ -196,7 +209,7 @@ class ExportService {
     return rows;
   }
 
-  void _applyLayout(excel_pkg.Sheet sheet) {
+  static void _applyLayout(excel_pkg.Sheet sheet) {
     // Lebar kolom menyesuaikan isi.
     final widths = <int, double>{
       1: 13, 2: 12, 3: 8, 4: 16, 5: 18, 6: 10,
@@ -294,7 +307,7 @@ class ExportService {
     }
   }
 
-  void _merge(excel_pkg.Sheet sheet, int col1, int row1, int col2, int row2) {
+  static void _merge(excel_pkg.Sheet sheet, int col1, int row1, int col2, int row2) {
     sheet.merge(
       excel_pkg.CellIndex.indexByColumnRow(
           columnIndex: col1, rowIndex: row1),
@@ -303,7 +316,7 @@ class ExportService {
     );
   }
 
-  void _styleCell(excel_pkg.Sheet sheet, int col, int row,
+  static void _styleCell(excel_pkg.Sheet sheet, int col, int row,
       excel_pkg.CellStyle style) {
     // Pertahankan nilai yang sudah ada (tulis null = menghapus nilai).
     final cell = sheet.cell(
@@ -315,7 +328,9 @@ class ExportService {
     );
   }
 
-  Uint8List buildCsvBytes(List<Device> devices) {
+  Uint8List buildCsvBytes(List<Device> devices) => _buildCsv(devices);
+
+  static Uint8List _buildCsv(List<Device> devices) {
     final buf = StringBuffer();
     buf.writeln(_headers.map(_csvEncode).join(';'));
     for (final d in devices) {
@@ -326,7 +341,7 @@ class ExportService {
     return Uint8List.fromList([...bom, ...buf.toString().codeUnits]);
   }
 
-  String _csvEncode(String v) {
+  static String _csvEncode(String v) {
     final s = v.replaceAll(RegExp(r'\r?\n'), ' ');
     if (s.contains(';') || s.contains('"') || s.contains(',')) {
       return '"${s.replaceAll('"', '""')}"';

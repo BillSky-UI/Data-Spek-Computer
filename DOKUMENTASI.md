@@ -105,7 +105,7 @@ lib/
 │   └── scan_page.dart            # Scanner QR / barcode
 ├── services/
 │   ├── export_service.dart       # Ekspor Excel multi-sheet & CSV
-│   ├── sticker_pdf_service.dart  # PDF stiker 15,5×6 cm
+│   ├── sticker_pdf_service.dart  # PDF stiker 15,5×6 cm & label printer 7,6×3,8 cm
 │   ├── detail_sheet_pdf_service.dart # Helper PDF
 │   ├── barcode_export_service.dart # Barcode & QR
 │   ├── pin_controller.dart       # Hash & verifikasi PIN
@@ -315,18 +315,36 @@ Jika tidak ada data yang cocok, muncul pesan **"Tidak ada data yang cocok"**.
 |---|---|---|
 | **Download Barcode** | Barcode + QR, siap cetak jadi stiker | **PNG** |
 | **Preview & Download PDF Spesifikasi** | Dokumen teks spesifikasi lengkap, ada preview | **A4 PDF** |
-| **Download Stiker (Template)** | Stiker inventaris + spesifikasi perangkat keras | **PDF 15,5 × 6 cm** |
+| **Download Stiker (Template)** | Stiker inventaris + spesifikasi perangkat keras | **PDF 15,5 × 6 cm** (printer: **7,6 × 3,8 cm**) |
 
 - Pada dialog stiker/barcode ada tombol **Download** dan **Bagikan** (kirim ke WhatsApp/dll).
 - **Stiker PDF tidak memuat barcode maupun QR** — isinya hanya judul, 2 baris identitas,
   sub-header, dan tabel perangkat keras. Butuh kode pindai? Gunakan menu **Download Barcode**
   (PNG) yang sudah tersedia terpisah.
-- Ukuran kertas stiker adalah **15,5 × 6 cm** (landscape). Posisi absolut semua elemen
+- Desain stiker dipilih otomatis dari kategori perangkat:
+
+  | Kategori | Desain | Kertas | Isi |
+  |---|---|---|---|
+  | Computer / Laptop | `Logo/Template Stiker.pdf` | 15,5 × 6 cm | Judul, 2 baris identitas, pita abu, tabel 5 komponen |
+  | **Printer** | `Logo/Label Inventaris Kantor.pdf` | **7,6 × 3,8 cm** | Nama Barang, Bagian, Nama PIC, Kode Unit, Keterangan |
+
+- **Stiker printer** memakai gambar desain asli (`assets/img/stiker_printer_bg.jpg`,
+  898 × 449 px) sebagai latar penuh, jadi logo, garis bingkai, dan tulisan label
+  identik dengan desain; yang digambar ulang hanya nilai datanya. Pemetaannya:
+  `Nama Barang` = kolom **Tipe / Model Printer** di form, `Bagian` = bagian,
+  `Nama PIC` = nama perangkat, `Kode Unit` = kode inventaris, `Keterangan` =
+  kolom keterangan. Posisi nilai diukur dari content stream PDF desain
+  (215,52 × 107,76 pt) lalu dikonversi ke milimeter.
+- Ukuran kertas stiker biasa adalah **15,5 × 6 cm** (landscape). Posisi absolut semua elemen
   (`pw.Stack` + `pw.Positioned`) diukur dari `Logo/Template Stiker.pdf` (ruang desain
   157 × 63 mm), lalu diperkecil seragam dengan faktor 0,9524 agar muat di kertas 15,5 × 6 cm
   tanpa meregangkan logo maupun garis. Tata letak tidak bergeser meskipun isi data
   berbeda-beda. Huruf dikecilkan otomatis bila teks terlalu lebar untuk kolomnya
-  (batas bawah 5 pt) supaya kode inventaris panjang tetap tercetak utuh.
+  (batas bawah 5 pt, atau 3 pt untuk stiker printer) supaya kode inventaris panjang
+  tetap tercetak utuh.
+- Kedua desain dibangun di isolate latar (`compute`) dengan aset gambar di-cache,
+  sehingga unduhan stiker tidak membekukan UI (±0,1 detik setelah aset ter-cache).
+
 
 ### 6.8 Tab 2 — Dashboard
 
@@ -555,7 +573,7 @@ inventaris dari file Excel ke `data/inventory.json`. Jalankan dengan `npm start`
 | **PLAN** | Program/Keggiaan kerja yang menjadi acuan perangkat. |
 | **Bagian** | Unit kerja / divisi pemilik perangkat. |
 | **Master Data** | Daftar acuan yang dipakai berulang di form (kode, plan, bagian). |
-| **Stiker** | Label kecil berisi identitas + spesifikasi perangkat keras (tanpa barcode/QR). |
+| **Stiker** | Label kecil berisi identitas + spesifikasi perangkat keras (tanpa barcode/QR). Printer memakai desain label tersendiri 7,6 × 3,8 cm. |
 | **Seed** | Pengisian awal data dari file Excel saat database kosong. |
 | **Upsert** | Menyisipkan data baru, atau memperbarui bila Kode Inventaris sudah ada. |
 | **Cache** | Salinan data di memori agar aplikasi cepat tanpa perlu unduhan ulang. |

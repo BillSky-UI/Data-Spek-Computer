@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/device.dart';
 import '../pages/print_preview_page.dart';
 import '../theme/app_theme.dart';
+import '../utils/field_groups.dart';
 import 'barcode_download_dialog.dart';
 import 'sticker_download_dialog.dart';
 
@@ -31,6 +32,9 @@ class PrintOptionsSheet extends StatelessWidget {
       MaterialPageRoute(builder: (_) => PrintPreviewPage(device: device)),
     );
   }
+
+  /// Printer memakai desain label 7,6 x 3,8 cm, kategori lain 15,5 x 6 cm.
+  bool get _isPrinter => categoryKey(device.category) == 'Printer';
 
   void _openSticker(BuildContext context) {
     Navigator.pop(context);
@@ -89,7 +93,10 @@ class PrintOptionsSheet extends StatelessWidget {
               icon: Icons.sticky_note_2_outlined,
               color: c.blue,
               title: 'Download Stiker (Template)',
-              subtitle: 'Stiker inventaris + spesifikasi perangkat (tanpa barcode & QR), format 15,5 x 6 cm',
+              subtitle: _isPrinter
+                  ? 'Label printer (tanpa barcode & QR), format 7,6 x 3,8 cm'
+                  : 'Stiker inventaris + spesifikasi perangkat '
+                      '(tanpa barcode & QR), format 15,5 x 6 cm',
               onTap: () => _openSticker(context),
             ),
           ],
