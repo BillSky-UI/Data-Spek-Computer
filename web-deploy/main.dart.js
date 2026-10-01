@@ -132128,7 +132128,7 @@ return A.k(a.Ly("PRAGMA table_info(devices)"),$async$Ar)
 case 4:s=!q.dt(c,new A.auq(),t.N).fb(0).p(0,"drive_link")?2:3
 break
 case 2:s=5
-return A.k(a.JF('ALTER TABLE devices ADD COLUMN drive_link TEXT DEFAULT ""'),$async$Ar)
+return A.k(a.JF("ALTER TABLE devices ADD COLUMN drive_link TEXT DEFAULT ''"),$async$Ar)
 case 5:case 3:return A.v(null,r)}})
 return A.w($async$Ar,r)},
 ug(a,b){return this.aAI(a,b)},
@@ -132275,7 +132275,7 @@ k=A.cO(m,l,"")
 if(k.length===0){q=null
 s=1
 break}s=4
-return A.k(n.aUC(0,"devices",1,'REPLACE(kode_inventaris, " ", "") = ? COLLATE NOCASE',[k]),$async$n1)
+return A.k(n.aUC(0,"devices",1,"REPLACE(kode_inventaris, ' ', '') = ? COLLATE NOCASE",[k]),$async$n1)
 case 4:o=c
 m=J.a9(o)
 if(m.gW(o)){q=null

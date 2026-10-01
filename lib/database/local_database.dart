@@ -51,7 +51,7 @@ class LocalDatabase {
     final names = cols.map((c) => (c['name'] ?? '').toString()).toSet();
     if (!names.contains('drive_link')) {
       await db.execute(
-          'ALTER TABLE $_tableDevices ADD COLUMN drive_link TEXT DEFAULT ""');
+          "ALTER TABLE $_tableDevices ADD COLUMN drive_link TEXT DEFAULT ''");
     }
   }
 
@@ -173,7 +173,7 @@ class LocalDatabase {
     if (normalized.isEmpty) return null;
     final rows = await db.query(
       _tableDevices,
-      where: 'REPLACE(kode_inventaris, " ", "") = ? COLLATE NOCASE',
+      where: "REPLACE(kode_inventaris, ' ', '') = ? COLLATE NOCASE",
       whereArgs: [normalized],
       limit: 1,
     );
