@@ -600,8 +600,12 @@ Sumber ikon: `assets/icon/logo.png` (adaptive background `#1E3A8A`).
 
 ### 9.8 Utilitas Node.js (`server.js`)
 
-Terpisah dari aplikasi Flutter. Berupa server **Express** + `xlsx` untuk membaca/menulis data  
-inventaris dari file Excel ke `data/inventory.json`. Jalankan dengan `npm start` (port 3000).
+Server **Express** pemeliharaan aplikasi lama (dulu menyajikan `public/`). Mulai versi 3.7,
+server ini menyajikan **build Flutter penuh** dari folder `web-deploy` (identik dengan APK) —
+`express.static` + fallback SPA ke `index.html`. Jalankan dengan `npm start` (port 3000).
+Endpoint API (`/api/devices`, `/api/import`) dan utilitas `xlsx` (membaca Excel ke
+`data/inventory.json`) masih ada untuk keperluan dukungan, namun aplikasi Flutter mode lokal
+memakai SQLite browser (`sqlite3.wasm`) sehingga tidak bergantung pada API tersebut.
 
 ---
 

@@ -6,7 +6,9 @@ const XLSX = require('xlsx');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const PUBLIC_DIR = path.join(__dirname, 'public');
+// Sajikan aplikasi Flutter penuh (web build = web-deploy, identik dengan APK).
+// Folder `public` (aplikasi HTML/JS lama) sudah digantikan.
+const STATIC_DIR = path.join(__dirname, 'web-deploy');
 const DATA_FILE = path.join(__dirname, 'data', 'inventory.json');
 const EXCEL_FILE = path.join(__dirname, global.EXCEL_FILENAME || 'Spesifikasi Komputer DPR (2).xlsx');
 
@@ -184,7 +186,7 @@ function save() {
 
 // ---------- MIDDLEWARE ----------
 app.use(express.json({ limit: '5mb' }));
-app.use(express.static(PUBLIC_DIR));
+app.use(express.static(STATIC_DIR));
 
 // ---------- API ----------
 app.get('/api/devices', (req, res) => {
@@ -275,16 +277,17 @@ app.post('/api/import', (req, res) => {
   }
 });
 
-// Serve app shell for any unknown route (SPA)
+// Serve app shell (Flutter) untuk setiap rute tak dikenal (SPA).
 app.get('*', (req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+  res.sendFile(path.join(STATIC_DIR, 'index.html'));
 });
 
 app.listen(PORT, () => {
   console.log('==============================================');
-  console.log('  INVENTARIS SPEK KOMPUTER - PWA');
+  console.log('  INVENTARIS SPEK KOMPUTER - PWA (Flutter)');
   console.log('==============================================');
   console.log(`  Server : http://localhost:${PORT}`);
+  console.log(`  Web    : ${STATIC_DIR}`);
   console.log(`  Excel  : ${EXCEL_PATH || '(TIDAK DITEMUKAN)'}`);
   console.log(`  Data   : ${inventory.length} perangkat dimuat`);
   console.log('----------------------------------------------');
