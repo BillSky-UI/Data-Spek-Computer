@@ -58,10 +58,18 @@ class PdfString {
 }
 
 class PdfProbe {
-  PdfProbe._(this._raw, this._streams);
+  PdfProbe._(this._raw, this._streams, this._hexToChar);
 
   final String _raw;
   final List<String> _streams;
+
+  /// Peta cid -> unicode hasil parsing CMap ToUnicode (untuk font TTF/CID).
+  ///
+  /// `package:pdf` menulis teks font TTF sebagai string hex `<xxxx>` yang
+  /// isinya *indeks karakter dalam subset*, bukan nilai unicode, sehingga
+  /// untuk membacanya kembali perlu disilangkan dengan CMap ToUnicode yang
+  /// disisipkan ke PDF (`<indeks> <unicode>` baris per baris).
+  final Map<int, int> _hexToChar;
 
   static const double mmPerPt = 25.4 / 72;
 
@@ -129,7 +137,7 @@ class PdfProbe {
   String get teksGabung =>
       items.map((e) => e.text).join().replaceAll(RegExp(r'\s+'), '');
 
-  List<PdfTextItem> get items => _items ??= _baca(_streams);
+  List<PdfTextItem> get items => _items ??= _baca(_streams, _hexToChar);
   List<PdfTextItem>? _items;
 
   /// Baseline unik (mm, pembulatan 0,1) yang dipakai di halaman ini.
@@ -141,26 +149,64 @@ class PdfProbe {
 
   static PdfProbe fromBytes(Uint8List bytes) {
     final raw = latin1.decode(bytes);
-    return PdfProbe._(raw, _inflate(bytes, raw));
+    final streams = _inflate(bytes, raw);
+    return PdfProbe._(
+      raw,
+      streams.where((s) => s.contains('BT')).toList(),
+      _parseToUnicode(streams, raw),
+    );
+  }
+
+  /// Membaca CMap ToUnicode pertama yang ditemukan: tiap baris berbentuk
+  /// `<0001> <0043>` — kiri = indeks karakter subset, kanan = unicode.
+  static Map<int, int> _parseToUnicode(List<String> streams, String raw) {
+    final map = <int, int>{};
+    for (final s in streams.isEmpty ? [raw] : <String>[...streams, raw]) {
+      final re = RegExp(r'beginbfchar\s*(.*?)\s*endbfchar', dotAll: true);
+      for (final m in re.allMatches(s)) {
+        final hex = RegExp(r'<([0-9A-Fa-f\s]+)>\s*<([0-9A-Fa-f\s]+)>');
+        for (final p in hex.allMatches(m.group(1)!)) {
+          final src = p.group(1)!.replaceAll(RegExp(r'\s'), '').toLowerCase();
+          final dst = p.group(2)!.replaceAll(RegExp(r'\s'), '').toLowerCase();
+          if (src.length != 4 || (dst.length != 4 && dst.length != 8)) {
+            continue;
+          }
+          final key = int.parse(src, radix: 16);
+          final u = int.parse(dst.substring(0, 4), radix: 16);
+          if (dst.length == 4) {
+            map[key] = u;
+          } else {
+            final lo = int.parse(dst.substring(4, 8), radix: 16);
+            map[key] = 0x10000 + ((u - 0xD800) << 10) + (lo - 0xDC00);
+          }
+        }
+        return map;
+      }
+    }
+    return map;
   }
 
   // ------------------------------------------------------------- tokenizer
-  static List<PdfTextItem> _baca(List<String> streams) {
+  static List<PdfTextItem> _baca(List<String> streams, Map<int, int> hexToChar) {
     final hasil = <PdfTextItem>[];
     for (final s in streams) {
-      _bacaStream(s, hasil);
+      _bacaStream(s, hexToChar, hasil);
     }
     return hasil;
   }
 
-  static void _bacaStream(String s, List<PdfTextItem> hasil) {
+  static void _bacaStream(
+    String s,
+    Map<int, int> hexToChar,
+    List<PdfTextItem> hasil,
+  ) {
     final stack = <PdfMatrix>[];
     var ctm = PdfMatrix.identity;
     var tm = PdfMatrix.identity;
     var fontSize = 0.0;
     final operand = <Object?>[];
 
-    for (final t in _tokenize(s)) {
+    for (final t in _tokenize(s, hexToChar)) {
       if (t is PdfString) {
         operand.add(t.value);
         continue;
@@ -241,7 +287,10 @@ class PdfProbe {
 
   /// Mengubah content stream menjadi daftar operand (angka/string) dan
   /// operator (String tanpa spasi).
-  static List<Object> _tokenize(String s) {
+  ///
+  /// String literal `(...)` dibaca apa adanya. String hex `<...>` (dipakai
+  /// `package:pdf` untuk font TTF) didekode menjadi teks lewat [hexToChar].
+  static List<Object> _tokenize(String s, Map<int, int> hexToChar) {
     final out = <Object>[];
     final buf = StringBuffer();
     var i = 0;
@@ -260,6 +309,22 @@ class PdfProbe {
         while (i < s.length && s[i] != '\n') {
           i++;
         }
+        continue;
+      }
+      if (c == '<') {
+        flush();
+        final sb = StringBuffer();
+        i++;
+        while (i < s.length && s[i] != '>') {
+          sb.write(s[i]);
+          i++;
+        }
+        if (i < s.length) i++; // lewati '>'
+        out.add(PdfString(_decodeHex(sb.toString(), hexToChar)));
+        continue;
+      }
+      if (c == '>') {
+        i++;
         continue;
       }
       if (c == '(') {
@@ -292,7 +357,7 @@ class PdfProbe {
         out.add(PdfString(sb.toString()));
         continue;
       }
-      if (c == '[' || c == ']' || c == '<' || c == '>') {
+      if (c == '[' || c == ']') {
         flush();
         i++;
         continue;
@@ -321,6 +386,20 @@ class PdfProbe {
   static bool _isWhitespace(String c) =>
       c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == '\f';
 
+  /// Menerjemahkan string hex `<xxxx>...` (indeks karakter subset) menjadi
+  /// teks unicode memakai peta bawaan CMap ToUnicode.
+  static String _decodeHex(String hex, Map<int, int> hexToChar) {
+    final h = hex.replaceAll(RegExp(r'\s'), '');
+    final buf = StringBuffer();
+    for (var i = 0; i + 3 < h.length; i += 4) {
+      final v = int.tryParse(h.substring(i, i + 4), radix: 16);
+      if (v == null) continue;
+      final ch = hexToChar[v];
+      if (ch != null && ch > 0) buf.writeCharCode(ch);
+    }
+    return buf.toString();
+  }
+
   static bool _isDelimiter(String c) =>
       _isWhitespace(c) ||
       c == '(' ||
@@ -347,11 +426,18 @@ class PdfProbe {
       while (end > start && (bytes[end - 1] == 13 || bytes[end - 1] == 10)) {
         end--;
       }
-      if (end <= start) continue;
+      // Lewati paling awal yang tidak mungkin benar: stream image mentah
+      // (DCTDecode dsb.) akan gagal ZLib dan di-skip di bawah.
+      if (end <= start) {
+        continue;
+      }
       try {
         final data = ZLibCodec().decode(bytes.sublist(start, end));
         final s = latin1.decode(data, allowInvalid: true);
-        if (s.contains('BT')) out.add(s);
+        // Jangan saring di sini: [_parseToUnicode] butuh stream CMap ToUnicode
+        // yang tidak berisi 'BT'. Nanti `fromBytes` yang memisahkan stream
+        // teks (berisi 'BT') untuk dicari item-nya.
+        out.add(s);
       } catch (_) {
         continue;
       }

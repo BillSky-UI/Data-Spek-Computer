@@ -321,20 +321,32 @@ Jika tidak ada data yang cocok, muncul pesan **"Tidak ada data yang cocok"**.
 - **Stiker PDF tidak memuat barcode maupun QR** — isinya hanya judul, 2 baris identitas,
   sub-header, dan tabel perangkat keras. Butuh kode pindai? Gunakan menu **Download Barcode**
   (PNG) yang sudah tersedia terpisah.
+- **Storage untuk stiker Computer/Laptop** bisa dipilih ulang saat cetak karena nilai
+  `storage` di input sering tidak konsisten (mis. "256GB SSD Sata"). Dialog menampilkan daftar
+  ukuran (8 GB–2TB); tiap ukuran bisa diisikan **jumlah unit** (mis. 256 GB ada 2 + 128 GB ada 3),
+  hasilnya dicetak sebagai `256 GB 2x + 128 GB 3x`. Tanpa pilihan, stiker memakai nilai tersimpan.
 - Desain stiker dipilih otomatis dari kategori perangkat:
 
   | Kategori | Desain | Kertas | Isi |
   |---|---|---|---|
   | Computer / Laptop | `Logo/Template Stiker.pdf` | 15,5 × 6 cm | Judul, 2 baris identitas, pita abu, tabel 5 komponen |
-  | **Printer** | `Logo/Label Inventaris Kantor.pdf` | **7,6 × 3,8 cm** | Nama Barang, Bagian, Nama PIC, Kode Unit, Keterangan |
+  | **Printer** | `Logo/Label Inventaris Kantor.pdf` | **7,6 × 3,8 cm** | Nama Barang, Bagian, Nama PIC, Kode Unit, Tanggal Penyerahan |
 
 - **Stiker printer** memakai gambar desain asli (`assets/img/stiker_printer_bg.jpg`,
   898 × 449 px) sebagai latar penuh, jadi logo, garis bingkai, dan tulisan label
   identik dengan desain; yang digambar ulang hanya nilai datanya. Pemetaannya:
   `Nama Barang` = kolom **Tipe / Model Printer** di form, `Bagian` = bagian,
-  `Nama PIC` = nama perangkat, `Kode Unit` = kode inventaris, `Keterangan` =
-  kolom keterangan. Posisi nilai diukur dari content stream PDF desain
-  (215,52 × 107,76 pt) lalu dikonversi ke milimeter.
+  `Nama PIC` = nama perangkat, `Kode Unit` = kode inventaris,
+  `Tanggal Penyerahan` = kolom **Tanggal Evaluasi** (ditulis di kotak kanan-bawah
+  desain, kolom **"Tgl.Penyerahan"** yang cuma ada di raster). Desain tidak punya
+  kolom Keterangan, jadi `keterangan` tidak dicetak di stiker printer. Posisi nilai
+  diukur dari content stream PDF desain (215,52 × 107,76 pt) lalu dikonversi ke milimeter.
+- **Font stiker printer**: desain memakai Calibri-Bold 6 pt. Calibri adalah font
+  proprietary Microsoft sehingga tidak disertakan; yang dipakai sebagai gantinya
+  **Carlito-Bold** (`assets/fonts/Carlito-Bold.ttf`), klon open-source yang
+  metrik dan tampilannya identik dengan Calibri — hasilnya hurufnya pas dengan
+  desain (Helvetica-Bold sebelumnya terlalu lebar). Kalau font gagal dimuat,
+  aplikasi jatuh ke Helvetica-Bold supaya PDF tetap bisa dibuat.
 - Ukuran kertas stiker biasa adalah **15,5 × 6 cm** (landscape). Posisi absolut semua elemen
   (`pw.Stack` + `pw.Positioned`) diukur dari `Logo/Template Stiker.pdf` (ruang desain
   157 × 63 mm), lalu diperkecil seragam dengan faktor 0,9524 agar muat di kertas 15,5 × 6 cm

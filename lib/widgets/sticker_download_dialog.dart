@@ -24,20 +24,54 @@ class StickerDownloadDialog extends StatefulWidget {
 }
 
 class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
+  static const List<String> _storageOptions = [
+    '8 GB',
+    '16 GB',
+    '32 GB',
+    '64 GB',
+    '128 GB',
+    '256 GB',
+    '512 GB',
+    '1TB',
+    '2TB',
+  ];
+
   bool _busy = false;
+
+  /// Jumlah unit tiap ukuran storage yang dipilih untuk dicetak (boleh lebih
+  /// dari satu ukuran, tiap ukuran bisa lebih dari satu unit). Diinput nilai
+  /// `storage` di database sering tidak konsisten namanya (mis. "256GB SSD
+  /// Sata"), jadi saat cetak bisa dipilih ulang dengan rapi, misal 256 GB ada
+  /// 2 unit + 128 GB ada 3 unit.
+  final Map<String, int> _storageCount = <String, int>{};
 
   Device get _d => widget.device;
   String get _safeKode =>
       _d.kodeInventaris.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
   String get _fileName => 'Stiker_$_safeKode.pdf';
 
-  Future<Uint8List> _build() => StickerPdfService.instance.buildSticker(_d);
+  /// Tinggal format cetak untuk ukuran yang dipilih, misal "256 GB 2x".
+  String _formatStorage(String o, int n) => n == 1 ? o : '$o ${n}x';
+
+  /// Ringkasan storage terpilih, misal "256 GB 2x + 128 GB 3x".
+  String get _storageTerpilih => _storageOptions
+      .where((o) => (_storageCount[o] ?? 0) > 0)
+      .map((o) => _formatStorage(o, _storageCount[o]!))
+      .join(' + ');
+
+  Future<Uint8List> _build() {
+    if (_storageTerpilih.isNotEmpty) {
+      final d = _d.copyWith()..storage = _storageTerpilih;
+      return StickerPdfService.instance.buildSticker(d);
+    }
+    return StickerPdfService.instance.buildSticker(_d);
+  }
 
   /// Keterangan label sesuai desain yang dipakai kategori ini.
   String get _deskripsi => _isPrinter
       ? 'PDF label printer 7,6 x 3,8 cm persis mengikuti '
         '"Label Inventaris Kantor": Nama Barang (Tipe/Model), Bagian, '
-        'Nama PIC, Kode Unit, dan Keterangan.'
+        'Nama PIC, Kode Unit, dan Tanggal Penyerahan.'
       : 'PDF stiker 15,5 x 6 cm (landscape) persis mengikuti '
         '"Template Stiker" (INVENTARIS & SPESIFIKASI, '
         'FRM-06/SOP-001-IT): grid identitas dan tabel perangkat '
@@ -104,6 +138,75 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Satu baris ukuran storage: label + stepper jumlah unit (- 0 +).
+  Widget _storageRow(String o, int n) {
+    final c = context.appColors;
+    final dipakai = n > 0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              o,
+              style: TextStyle(
+                color: dipakai ? c.textPrimary : c.textMuted,
+                fontSize: 12,
+                fontWeight: dipakai ? FontWeight.w700 : FontWeight.w400,
+              ),
+            ),
+          ),
+          _stepper(icon: Icons.remove, onTap: n > 0 ? () => _ubahStorage(o, -1) : null),
+          SizedBox(
+            width: 26,
+            child: Text(
+              '$n',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: dipakai ? c.textPrimary : c.textMuted,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          _stepper(icon: Icons.add, onTap: () => _ubahStorage(o, 1)),
+        ],
+      ),
+    );
+  }
+
+  Widget _stepper({required IconData icon, VoidCallback? onTap}) {
+    final c = context.appColors;
+    return Material(
+      color: c.surfaceAlt,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          width: 30,
+          height: 26,
+          child: Icon(
+            icon,
+            size: 16,
+            color: onTap == null ? c.textMuted.withValues(alpha: 0.35) : c.blue,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _ubahStorage(String o, int delta) {
+    setState(() {
+      final hasil = (_storageCount[o] ?? 0) + delta;
+      if (hasil <= 0) {
+        _storageCount.remove(o);
+      } else {
+        _storageCount[o] = hasil;
+      }
+    });
   }
 
   void _toast(String msg) {
@@ -200,6 +303,51 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
                   height: 1.35,
                 ),
               ),
+              if (!_isPrinter) ...[
+                const SizedBox(height: 14),
+                Text(
+                  'Storage yang dicetak (boleh lebih dari satu)',
+                  style: TextStyle(
+                    color: c.textPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "Atur jumlah unit tiap ukuran — misalnya \"256 GB\" ada 2, "
+                  '"128 GB" ada 3.',
+                  style: TextStyle(color: c.textMuted, fontSize: 11),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(color: c.border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < _storageOptions.length; i++) ...[
+                        if (i > 0)
+                          Divider(height: 1, thickness: 1, color: c.border),
+                        _storageRow(
+                          _storageOptions[i],
+                          _storageCount[_storageOptions[i]] ?? 0,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _storageTerpilih.isEmpty
+                      ? 'Akan mengikuti data input: '
+                          '${_d.storage.trim().isEmpty ? '(kosong)' : _d.storage.trim()}'
+                      : 'Storage yang dicetak: $_storageTerpilih',
+                  style: TextStyle(color: c.textMuted, fontSize: 11),
+                ),
+              ],
               const SizedBox(height: 12),
               Row(
                 children: [

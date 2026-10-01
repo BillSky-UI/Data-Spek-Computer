@@ -28,9 +28,11 @@ Device contohPrinter({
   String kode = 'PR-001',
   String pic = 'Eky',
   String ket = 'Unit Aktif',
+  String tgl = '20/10/2025',
 }) =>
     Device(
       kodeInventaris: kode,
+      tanggalEvaluasi: tgl,
       bagian: 'IT',
       deviceName: pic,
       category: 'Printer',
@@ -229,17 +231,34 @@ void main() {
       expect(t, contains('IT'), reason: 'Bagian');
       expect(t, contains('Eky'), reason: 'Nama PIC');
       expect(t, contains('PR-001'), reason: 'Kode Unit');
-      expect(t, contains('UnitAktif'), reason: 'Keterangan');
+      expect(t, contains('20/10/2025'), reason: 'Tanggal Penyerahan');
+      // Kolom Keterangan tidak ada di desain, jadi tidak boleh tercetak.
+      expect(
+        t,
+        isNot(contains('UnitAktif')),
+        reason: 'desain tidak punya kolom Keterangan',
+      );
+    });
+
+    test('teks memakai font Carlito-Bold (bukan Helvetica)', () {
+      // Font desain adalah Calibri-Bold yang tidak boleh disertakan karena
+      // proprietary; penggantinya Carlito-Bold, klon metrik-identik.
+      expect(
+        probe.raw.contains('Carlito-Bold'),
+        isTrue,
+        reason: 'file PDF harus menyematkan subset Carlito-Bold',
+      );
+      expect(probe.raw.contains('Helvetica'), isFalse);
     });
 
     test('posisi tiap nilai mengikuti desain', () {
       // (x dari tepi kiri, baseline dari tepi bawah) hasil ukur content stream.
       const desain = <List<double>>[
-        [15.82, 28.24], // Nama Barang  (44,832 pt, baseline 80,051 pt)
-        [15.74, 24.35], // Bagian       (44,623 pt, baseline 69,023 pt)
-        [15.69, 19.53], // Nama PIC     (44,478 pt, baseline 55,347 pt)
-        [53.96, 28.55], // Kode Unit    (152,945 pt, baseline 80,918 pt)
-        [48.07, 14.69], // Keterangan   (136,248 pt, baseline 41,623 pt)
+        [15.82, 28.24], // Nama Barang       (44,832 pt, baseline 80,051 pt)
+        [15.74, 24.35], // Bagian            (44,623 pt, baseline 69,023 pt)
+        [15.69, 19.53], // Nama PIC          (44,478 pt, baseline 55,347 pt)
+        [53.96, 28.55], // Kode Unit         (152,945 pt, baseline 80,918 pt)
+        [48.07, 14.69], // Tanggal Penyerahan(136,248 pt, baseline 41,623 pt)
       ];
       for (final d in desain) {
         final ada = probe.items.any(
@@ -253,6 +272,13 @@ void main() {
           reason: 'tidak ada teks di x=${d[0]}, y=${d[1]}',
         );
       }
+      // Tanggal Penyerahan tidak boleh lagi tercetak di bawah Kode Unit.
+      final salah = probe.items.any(
+        (e) =>
+            (e.xMm - 53.96).abs() < toleransi &&
+            (e.yMm - 24.35).abs() < toleransi,
+      );
+      expect(salah, isFalse, reason: 'tanggal tidak boleh di bawah Kode Unit');
     });
 
     test('ukuran huruf mengikuti desain 6 pt', () {
@@ -348,8 +374,8 @@ void main() {
       expect(e.yMm, greaterThan(0), reason: '"${e.text}" di bawah');
       expect(e.yMm, lessThan(38.02), reason: '"${e.text}" di atas');
     }
-    // Keterangan tetap tercetak utuh walau tiga nilai lain panjang.
-    expect(probe.teksGabung, contains('UnitAktif'));
+    // Keterangan tidak boleh dicetak (desain tidak punya kolomnya).
+    expect(probe.teksGabung, isNot(contains('UnitAktif')));
   });
 
   test('stiker printer: data kosong tidak membuat PDF gagal', () async {

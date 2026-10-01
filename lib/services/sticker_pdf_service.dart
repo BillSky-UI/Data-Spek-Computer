@@ -228,20 +228,18 @@ class StickerPdfService {
   static const double _pPicY = 18.49; // baseline 55,347 pt
   static const double _pKodeX = 53.96; // 152,945 pt
   static const double _pKodeY = 9.47; // baseline 80,918 pt
-  static const double _pKetX = 48.07; // 136,248 pt
-  static const double _pKetY = 23.33; // baseline 41,623 pt
 
-  /// Tanggal Penyerahan tidak ada di desain asli (yang hanya punya 5 slot),
-  /// jadi posisinya disamakan dengan baris "Bagian" di kolom kanan, memberi
-  /// bentuk form 2 kolom yang rata. Lebarnya mengikuti kolom Kode Unit.
-  static const double _pTglX = 53.96;
-  static const double _pTglY = 13.67;
+  /// Kolom "Tgl.Penyerahan" di desain ikut terbakar di raster (tidak ada
+  /// objek teksnya di content stream), jadi posisi kotaknya diambil dari
+  /// area nilai yang dipakai desain di bawah kanan label.
+  static const double _pTglX = 48.07;
+  static const double _pTglY = 23.33; // baseline 41,623 pt
 
   /// Lebar area nilai. Batas kanan kolom kiri diambil sebelum area Kode Unit
   /// mulai (x = 53,96 mm); nilai yang lebih panjang akan mengecilkan huruf.
   static const double _pKolW = 28.0;
   static const double _pKodeW = 19.5;
-  static const double _pKetW = 26.0;
+  static const double _pTglW = 26.0;
 
   /// Font terpisah hanya untuk mengukur lebar teks (butuh PdfDocument).
   static final PdfDocument _ukurDoc = PdfDocument();
@@ -528,20 +526,42 @@ class StickerPdfService {
     return doc.save();
   }
 
-  /// Membangun stiker printer: gambar desain sebagai latar penuh, lalu
-  /// lima nilai data ditulis di posisinya masing-masing.
+  /// Membangun stiker printer: gambar desain sebagai latar penuh, lalu lima
+  /// nilai data ditulis di posisinya masing-masing.
   ///
   /// Pemetaan data (lihat `printerSpecLabel` di `lib/utils/field_groups.dart`):
-  /// - Nama Barang -> `prosesor` (di form berlabel "Tipe / Model Printer")
-  /// - Bagian      -> `bagian`
-  /// - Nama PIC    -> `deviceName`
-  /// - Kode Unit   -> `kodeInventaris`
-  /// - Keterangan  -> `keterangan` (opsional)
+  /// - Nama Barang       -> `prosesor` (label form "Tipe / Model Printer")
+  /// - Bagian            -> `bagian`
+  /// - Nama PIC          -> `deviceName`
+  /// - Kode Unit         -> `kodeInventaris`
+  /// - Tanggal Penyerahan -> `tanggalEvaluasi` (kolom "Tgl.Penyerahan")
+  ///
+  /// Desain tidak punya kolom Keterangan, jadi `keterangan` tidak dicetak.
   static Future<Uint8List> _rakitStikerPrinter(PrinterStikerJob job) {
     final d = job.d;
     final m = PdfPageFormat.mm;
     final doc = pw.Document();
-    final bold = pw.Font.helveticaBold();
+
+    // Font desain: Calibri-Bold 6 pt -> Carlito-Bold (klon open-source yang
+    // metriknya identik). Kalau byte font gagal dimuat, fallback ke
+    // Helvetica-Bold supaya PDF tetap bisa dibuat.
+    final fb = job.fontBytes;
+    var bold = pw.Font.helveticaBold();
+    PdfFont pengukur = _ukurBold;
+    var unicode = false;
+    if (fb != null) {
+      try {
+        final data =
+            ByteData.view(fb.buffer, fb.offsetInBytes, fb.lengthInBytes);
+        unicode = true;
+        pengukur = PdfTtfFont(_ukurDoc, data);
+        bold = pw.Font.ttf(data);
+      } catch (_) {
+        // fallback: PDF tetap valid walau hurufnya lebih lebar dari desain
+        bold = pw.Font.helveticaBold();
+        pengukur = _ukurBold;
+      }
+    }
 
     String isi(String s) {
       final t = s.trim();
@@ -580,7 +600,8 @@ class StickerPdfService {
           width: width,
           size: _printerFs,
           font: bold,
-          pengukur: _ukurBold,
+          pengukur: pengukur,
+          unicode: unicode,
         );
 
     // Kolom kiri: Nama Barang / Bagian / Nama PIC.
@@ -588,9 +609,10 @@ class StickerPdfService {
       ..add(tulis(d.prosesor, _pBarangX, _pBarangY, _pKolW))
       ..add(tulis(d.bagian, _pBagianX, _pBagianY, _pKolW))
       ..add(tulis(d.deviceName, _pPicX, _pPicY, _pKolW))
-      // Kanan atas: Kode Unit. Bawah: Keterangan.
+      // Kolom kanan: Kode Unit (atas) dan Tanggal Penyerahan (kotak bawah,
+      // kolom desain "Tgl.Penyerahan" yang hanya ada di raster).
       ..add(tulis(d.kodeInventaris, _pKodeX, _pKodeY, _pKodeW))
-      ..add(tulis(d.keterangan, _pKetX, _pKetY, _pKetW));
+      ..add(tulis(d.tanggalEvaluasi, _pTglX, _pTglY, _pTglW));
 
     doc.addPage(
       pw.Page(
@@ -608,6 +630,9 @@ class StickerPdfService {
   /// Berbeda dengan [_teks] yang memakai koordinat ruang desain umum, helper
   /// ini bekerja langsung dalam milimeter label printer. Huruf otomatis
   /// dikecilkan bila teks lebih lebar dari [width].
+  ///
+  /// [unicode] `true` bila [font] adalah font TTF (Carlito) sehingga teks tidak
+  /// dipaksa ke Latin-1; nilainya `false` untuk fallback Helvetica.
   static pw.Widget _teksPrinter(
     String text, {
     required double x,
@@ -616,9 +641,10 @@ class StickerPdfService {
     required double size,
     required pw.Font font,
     required PdfFont pengukur,
+    bool unicode = false,
   }) {
     final m = PdfPageFormat.mm;
-    final s = _latin1(text);
+    final s = unicode ? text : _latin1(text);
     if (s.isEmpty) return pw.SizedBox();
 
     var fs = size;

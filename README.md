@@ -109,7 +109,7 @@ lib/
 │   └── scan_page.dart            # Scanner QR / barcode
 ├── services/
 │   ├── export_service.dart       # Ekspor Excel multi-sheet & CSV
-│   ├── sticker_pdf_service.dart  # PDF stiker 157×63 mm
+│   ├── sticker_pdf_service.dart  # PDF stiker 15,5×6 cm & label printer 7,6×3,8 cm
 │   ├── detail_sheet_pdf_service.dart # Helper PDF
 │   ├── barcode_export_service.dart # Barcode & QR
 │   ├── pin_controller.dart       # Hash & verifikasi PIN
@@ -342,6 +342,9 @@ Jika tidak ada data yang cocok, muncul pesan **"Tidak ada data yang cocok"**.
   Butuh kode pindai? Gunakan menu **Download Barcode** (PNG) yang tersedia terpisah, berisi QR
   yang mengarah ke halaman web publik bila `PUBLIC_BASE_URL` dikonfigurasi (`?kode=K-001`), atau
   berisi kode inventaris langsung bila tidak.
+- **Storage stiker Computer/Laptop** bisa dipilih ulang per jumlah unit saat cetak (8 GB–2TB,
+  misal `256 GB 2x + 128 GB 3x`) karena nilai `storage` di input sering tidak konsisten;
+  tanpa pilihan, stiker memakai nilai tersimpan. Kategori Printer tidak menampilkan opsi ini.
 - Desain stiker dipilih otomatis dari kategori perangkat:
 
   | Kategori | Desain | Kertas |
@@ -352,7 +355,8 @@ Jika tidak ada data yang cocok, muncul pesan **"Tidak ada data yang cocok"**.
 - **Stiker printer** memakai gambar desain asli sebagai latar penuh
   (`assets/img/stiker_printer_bg.jpg`, 898 × 449 px) sehingga logo, garis bingkai, dan tulisan
   label identik dengan desain; yang digambar ulang hanya nilainya: Nama Barang (Tipe/Model),
-  Bagian, Nama PIC, Kode Unit, dan Keterangan.
+  Bagian, Nama PIC, Kode Unit, dan Tanggal Penyerahan (dari kolom Tanggal Evaluasi, ditulis di
+  kotak kanan-bawah desain). Desain tidak punya kolom Keterangan, jadi keterangan tidak dicetak.
 - **Link Google Drive** yang diisi pada device tidak ikut dicetak pada stiker PDF, tapi tetap
   di-encode ke QR pada menu Download Barcode.
 - Posisi absolut semua elemen (`pw.Stack` + `pw.Positioned`) diukur dari masing-masing file PDF
