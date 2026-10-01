@@ -1,0 +1,26 @@
+# Tidak perlu ikut ter-upload ke Vercel (outputDirectory = web-deploy)
+android/
+ios/
+lib/
+test/
+supabase/
+build/
+public/
+tool/
+data/
+node_modules/
+assets/
+docs/
+logo/
+Logo/
+*.md
+.git/
+.gitignore
+analysis_options.yaml
+pubspec.yaml
+pubspec.lock
+.metadata
+server.js
+make-icons.js
+package.json
+package-lock.json

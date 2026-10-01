@@ -581,6 +581,27 @@ flutter build web
 Folder `web/` sudah disiapkan sebagai PWA (manifest, ikon, `sqlite3.wasm`, service worker  
 `sqflite_sw.js`).
 
+Hasil build yang **dibagikan ke web** adalah folder **`web-deploy/`** (hasil `flutter build web
+--release` yang disalin ke sana dan ikut ter-commit). Folder inilah yang sama dengan aplikasi
+di HP — dipakai untuk hosting statis (GitHub Pages, Netlify, Vercel, dsb.) maupun disajikan
+`server.js`.
+
+### 9.5.1 Deploy ke Vercel
+
+`vercel.json` sudah disiapkan: `buildCommand` kosong (tanpa proses build di sisi Vercel) dan
+`outputDirectory: web-deploy`. `.vercelignore` membuang source Flutter (`lib/`, `android/`,
+`ios/`, `test/`, `build/`, `assets/`, `public/`, `node_modules/`, dsb.) agar upload lebih ringan.
+
+Langkah deploy ulang setiap ada perubahan:
+
+```bash
+flutter build web --release
+# salin isi build\web ke web-deploy\, boleh lewati file *.symbols (debug symbols)
+git add web-deploy && git commit -m "Perbarui build web" && git push
+```
+
+Vercel (Git integration) otomatis rebuild dari `outputDirectory` = `web-deploy`.
+
 ### 9.6 Kualitas Kode
 
 ```bash
