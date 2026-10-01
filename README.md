@@ -123,8 +123,8 @@ lib/
 
 assets/
 ├── icon/logo.png                 # Logo aplikasi
-├── Spesifikasi Komputer DPR (2).xlsx        # Sumber data awal (seed)
-└── Spesifikasi Komputer (PC) Internal ... .xlsx
+├── seed_inventaris.xlsx          # Sumber data awal (seed, nama tanpa spasi)
+└── arsip_spesifikasi_komputer_pc_internal.xlsx
 
 test/                             # 5 file test otomatis (19 test)
 android/, ios/, web/              # Proyek native per platform
@@ -201,8 +201,11 @@ Aplikasi punya **dua mode** yang dipilih otomatis:
    - Aplikasi tetap berfungsi penuh secara offline.
 3. **Data Awal (Seed)**
    - Saat database masih kosong, aplikasi otomatis mengisi data dari file Excel  
-    bawaan (`assets/Spesifikasi Komputer DPR (2).xlsx`).
-   - File Excel kedua (Spesifikasi Komputer PC Internal) merupakan data historis/arsip.
+     bawaan (`assets/seed_inventaris.xlsx`).
+   - File Excel kedua (`assets/arsip_spesifikasi_komputer_pc_internal.xlsx`) merupakan data historis/arsip.
+   - Nama file aset **wajib tanpa spasi**: build web menaruh aset dengan nama ter-URL-encode
+     (`%20`), sedangkan server statis (Vercel/Netlify/Express) mendekode-nya menjadi spasi
+     sehingga file tidak ditemukan → error "Unable to load assets/…".
 
 Anda dapat melihat mode yang aktif di **Pengaturan → Informasi Aplikasi → Basis Data**  
 (`Lokal (SQLite) — offline` atau `Supabase Cloud (real-time sync)`).

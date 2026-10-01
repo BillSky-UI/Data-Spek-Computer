@@ -14,8 +14,12 @@ import 'local_database.dart';
 /// Supabase belum dikonfigurasi / gagal terhubung.
 ///
 /// Saat mode lokal aktif, aplikasi otomatis men-seed data dari Excel
-/// ("Spesifikasi Komputer DPR (2).xlsx", sheet 'Spesifikasi Komputer')
+/// ("assets/seed_inventaris.xlsx", sheet 'Spesifikasi Komputer')
 /// ke SQLite sehingga daftar perangkat langsung terisi tanpa banner error.
+///
+/// Nama file aset sengaja tanpa spasi: build web menaruh aset dengan nama
+/// ter-URL-encode (`%20`), sedangkan server statis (Vercel/Netlify/Express)
+/// mendekode-nya kembali menjadi spasi sehingga file tidak ditemukan.
 ///
 /// Menjadi ChangeNotifier: tiap perubahan dari Cloud/lokal langsung memicu
 /// rebuild seluruh halaman yang mendengarkan.
@@ -32,7 +36,7 @@ class DbHelper extends ChangeNotifier {
   static const String _tPlan = 'plan';
   static const String _tSettings = 'app_settings';
 
-  static const String _assetExcel = 'assets/Spesifikasi Komputer DPR (2).xlsx';
+  static const String _assetExcel = 'assets/seed_inventaris.xlsx';
   static const String _sheetName = 'Spesifikasi Komputer';
 
   SupabaseClient? _client;

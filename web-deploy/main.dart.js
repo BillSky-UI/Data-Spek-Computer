@@ -131817,7 +131817,7 @@ return A.w($async$nu,r)},
 ym(){var s=0,r=A.x(t.xM),q,p=this,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0
 var $async$ym=A.y(function(b1,b2){if(b1===1)return A.u(b2,r)
 for(;;)switch(s){case 0:s=3
-return A.k($.UT().jA(0,"assets/Spesifikasi Komputer DPR (2).xlsx"),$async$ym)
+return A.k($.UT().jA(0,"assets/seed_inventaris.xlsx"),$async$ym)
 case 3:a9=b2
 b0=A.b65(J.cn(B.aO.gV(a9),a9.byteOffset,a9.byteLength)).gaeL().h(0,"Spesifikasi Komputer")
 if(b0==null){q=A.b([],t.lm)

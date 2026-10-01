@@ -10,7 +10,7 @@ import 'public_saver_service.dart';
 /// Export data inventaris ke Excel multi-sheet dengan kop perusahaan.
 ///
 /// Mengikuti format tata letak master
-/// `assets/Spesifikasi Komputer (PC) Internal PT. Dwi Prima Rezeky (1).xlsx`:
+/// `assets/arsip_spesifikasi_komputer_pc_internal.xlsx`:
 /// kop "PT. DWI PRIMA REZEKY - IT", judul laporan "Quality of Devices (…)",
 /// periode "Tahun YYYY", lalu tabel dua-baris header (kelompok
 /// "Spesifikasi Saat Ini" & "Perlu Upgrade") dan baris data.
