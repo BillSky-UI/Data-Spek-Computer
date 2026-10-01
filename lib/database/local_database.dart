@@ -117,7 +117,7 @@ class LocalDatabase {
 
   Future<void> _seedMastersFromDevices(Database db) async {
     final bagian = await db.rawQuery(
-        'SELECT DISTINCT bagian FROM $_tableDevices WHERE bagian IS NOT NULL AND bagian != ""');
+        "SELECT DISTINCT bagian FROM $_tableDevices WHERE bagian IS NOT NULL AND bagian != ''");
     for (final r in bagian) {
       final name = (r['bagian'] ?? '').toString().trim();
       if (name.isEmpty) continue;
@@ -125,7 +125,7 @@ class LocalDatabase {
           conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     final plans = await db.rawQuery(
-        'SELECT DISTINCT plan FROM $_tableDevices WHERE plan IS NOT NULL AND plan != ""');
+        "SELECT DISTINCT plan FROM $_tableDevices WHERE plan IS NOT NULL AND plan != ''");
     for (final r in plans) {
       final name = (r['plan'] ?? '').toString().trim();
       if (name.isEmpty) continue;
@@ -313,14 +313,14 @@ class LocalDatabase {
   Future<List<String>> distinctBagian() async {
     final db = await database;
     final rows = await db.rawQuery(
-        'SELECT DISTINCT bagian FROM $_tableDevices WHERE bagian IS NOT NULL AND bagian != "" ORDER BY bagian ASC');
+        "SELECT DISTINCT bagian FROM $_tableDevices WHERE bagian IS NOT NULL AND bagian != '' ORDER BY bagian ASC");
     return rows.map((r) => (r['bagian'] ?? '').toString()).toList();
   }
 
   Future<List<String>> distinctPlan() async {
     final db = await database;
     final rows = await db.rawQuery(
-        'SELECT DISTINCT plan FROM $_tableDevices WHERE plan IS NOT NULL AND plan != "" ORDER BY plan ASC');
+        "SELECT DISTINCT plan FROM $_tableDevices WHERE plan IS NOT NULL AND plan != '' ORDER BY plan ASC");
     return rows.map((r) => (r['plan'] ?? '').toString()).toList();
   }
 }

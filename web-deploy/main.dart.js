@@ -132173,7 +132173,7 @@ aFx(a){var s=0,r=A.x(t.H),q,p,o,n,m,l,k,j
 var $async$un=A.y(function(b,c){if(b===1)return A.u(c,r)
 for(;;)switch(s){case 0:j=J
 s=2
-return A.k(a.Ly('SELECT DISTINCT bagian FROM devices WHERE bagian IS NOT NULL AND bagian != ""'),$async$un)
+return A.k(a.Ly("SELECT DISTINCT bagian FROM devices WHERE bagian IS NOT NULL AND bagian != ''"),$async$un)
 case 2:q=j.aS(c),p=t.N,o=t.X
 case 3:if(!q.q()){s=4
 break}n=J.n(q.gK(q),"bagian")
@@ -132190,7 +132190,7 @@ case 5:s=3
 break
 case 4:j=J
 s=6
-return A.k(a.Ly('SELECT DISTINCT plan FROM devices WHERE plan IS NOT NULL AND plan != ""'),$async$un)
+return A.k(a.Ly("SELECT DISTINCT plan FROM devices WHERE plan IS NOT NULL AND plan != ''"),$async$un)
 case 6:q=j.aS(c)
 case 7:if(!q.q()){s=8
 break}n=J.n(q.gK(q),"plan")
