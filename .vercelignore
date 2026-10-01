@@ -1,26 +1,40 @@
-# Tidak perlu ikut ter-upload ke Vercel (outputDirectory = web-deploy)
-android/
-ios/
-lib/
-test/
-supabase/
-build/
-public/
-tool/
-data/
-node_modules/
-assets/
-docs/
-logo/
-Logo/
+# Vercel: buang source Flutter agar upload ringan.
+#
+# PENTING: semua pola WAJIB diawali "/" (anchor ke root). Tanpa garis miring
+# depan, pola seperti "assets/" juga akan cocok di semua level dan ikut
+# membuang web-deploy/assets/ — folder yang berisi seluruh aset Flutter
+# (seed_inventaris.xlsx, Carlito-Bold.ttf, logo, gambar stiker, AssetManifest).
+# Akibatnya situs gagal memuat aset: "Unable to load assets/...".
+#
+# Yang TIDAK boleh di-exclude: web-deploy/ (outputDirectory Vercel).
+
+# Sumber Flutter (hanya di root)
+/android/
+/ios/
+/lib/
+/test/
+/supabase/
+/build/
+/public/
+/tool/
+/data/
+/node_modules/
+/assets/
+/docs/
+/Logo/
+/logo/
+/.git/
+/.gitignore
+/.metadata
+/analysis_options.yaml
+/vercel.json
+/.vercelignore
+
+# Berkas teks di root
+/package.json
+/package-lock.json
+/make-icons.js
+/server.js
+/pubspec.yaml
+/pubspec.lock
 *.md
-.git/
-.gitignore
-analysis_options.yaml
-pubspec.yaml
-pubspec.lock
-.metadata
-server.js
-make-icons.js
-package.json
-package-lock.json
