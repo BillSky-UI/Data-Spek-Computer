@@ -246,19 +246,17 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
             _field(context, _motherboard, labelFor('motherboard', _category),
                 _isPrinter ? 'cth: USB + WiFi + LAN' : 'cth: H81M-K'),
             if (!_isPrinter)
-            _field(context, _ram, labelFor('ram', _category),
-                _isPrinter ? 'cth: 33 ppm monokrom' : 'cth: 16 GBytes'),
+            _field(context, _ram, labelFor('ram', _category), 'cth: 16 GBytes'),
             if (!_isPrinter)
             _field(context, _storage, labelFor('storage', _category),
-                _isPrinter ? 'cth: A4, tray 2 x 250 lembar' : 'Detail storage / disk',
+                'Detail storage / disk',
                 maxLines: 3),
             if (!_isPrinter)
             _field(context, _os, labelFor('osWindows', _category),
-                _isPrinter ? 'cth: Windows 10 / macOS / Linux' : 'cth: Windows 10 Pro',
+                'cth: Windows 10 Pro',
                 maxLines: 2),
             if (!_isPrinter)
-            _field(context, _goal, labelFor('goal', _category),
-                _isPrinter ? 'cth: Tinta terisi' : 'cth: Tercapai'),
+            _field(context, _goal, labelFor('goal', _category), 'cth: Tercapai'),
             _dropdown(context, label: labelFor('perluUpgradeGanti', _category),
                 value: _ganti,
                 options: _fixedOptions(_ganti, const ['Yes', 'No']),

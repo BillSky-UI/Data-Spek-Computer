@@ -111,16 +111,28 @@ const _specLabels = <String, String>{
 const _printerLabels = <String, String>{
   'prosesor': 'Tipe / Model Printer',
   'motherboard': 'Metode Koneksi (USB / WiFi / Network)',
-  'ram': 'Kecepatan Cetak (ppm)',
-  'storage': 'Kapasitas & Tray Kertas',
-  'osWindows': 'Kompatibilitas Sistem / Driver',
-  'goal': 'Status Tinta / Toner',
   'perluUpgradeGanti': 'Perlu Ganti (Sparepart / Unit)',
   'perluUpgradeRepair': 'Perlu Repair',
   'statusUpgrade': 'Status Perbaikan',
   'keterangan': 'Keterangan',
   'statusStiker': 'Status Stiker',
 };
+
+/// Field yang tidak relevan untuk Printer sehingga tidak ditampilkan di
+/// halaman detail perangkat, preview cetak, dan lembar PDF.
+///
+/// Data lama di kolom ini tetap tersimpan di database, hanya disembunyikan
+/// dari tampilan supaya printer tidak menampilkan baris kosong.
+const _printerHiddenKeys = <String>{
+  'ram',
+  'storage',
+  'osWindows',
+  'goal',
+};
+
+/// Benar bila field ini perlu ditampilkan untuk kategori perangkat tersebut.
+bool showSpecField(String key, String category) =>
+    !(categoryKey(category) == 'Printer' && _printerHiddenKeys.contains(key));
 
 /// Label field untuk kategori tertentu (Printer → label khusus printer).
 String labelFor(String key, String category) =>

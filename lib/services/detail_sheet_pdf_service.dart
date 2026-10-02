@@ -77,10 +77,13 @@ class DetailSheetPdfService {
         ('Category', categoryKey(d.category)),
         (labelFor('prosesor', d.category), d.prosesor),
         (labelFor('motherboard', d.category), d.motherboard),
-        (labelFor('ram', d.category), d.ram),
-        (labelFor('storage', d.category), d.storage),
-        (labelFor('osWindows', d.category), d.osWindows),
-        (labelFor('goal', d.category), d.goal),
+        if (showSpecField('ram', d.category))
+          (labelFor('ram', d.category), d.ram),
+        if (showSpecField('storage', d.category))
+          (labelFor('storage', d.category), d.storage),
+        if (showSpecField('osWindows', d.category))
+          (labelFor('osWindows', d.category), d.osWindows),
+        if (showSpecField('goal', d.category)) (labelFor('goal', d.category), d.goal),
         (labelFor('statusUpgrade', d.category), d.statusUpgrade),
         (labelFor('perluUpgradeGanti', d.category), d.perluUpgradeGanti),
         (labelFor('perluUpgradeRepair', d.category), d.perluUpgradeRepair),

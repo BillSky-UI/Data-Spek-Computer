@@ -153,10 +153,14 @@ class _PrintPreviewPageState extends State<PrintPreviewPage> {
       ('Category', categoryKey(_d.category)),
       (labelFor('prosesor', _d.category), _d.prosesor),
       (labelFor('motherboard', _d.category), _d.motherboard),
-      (labelFor('ram', _d.category), _d.ram),
-      (labelFor('storage', _d.category), _d.storage),
-      (labelFor('osWindows', _d.category), _d.osWindows),
-      (labelFor('goal', _d.category), _d.goal),
+      if (showSpecField('ram', _d.category))
+        (labelFor('ram', _d.category), _d.ram),
+      if (showSpecField('storage', _d.category))
+        (labelFor('storage', _d.category), _d.storage),
+      if (showSpecField('osWindows', _d.category))
+        (labelFor('osWindows', _d.category), _d.osWindows),
+      if (showSpecField('goal', _d.category))
+        (labelFor('goal', _d.category), _d.goal),
       (labelFor('statusUpgrade', _d.category), _d.statusUpgrade),
       (labelFor('perluUpgradeGanti', _d.category), _d.perluUpgradeGanti),
       (labelFor('perluUpgradeRepair', _d.category), _d.perluUpgradeRepair),

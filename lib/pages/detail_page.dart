@@ -171,10 +171,14 @@ class _DetailPageState extends State<DetailPage> {
         ('Category', _device.category),
         (labelFor('prosesor', _device.category), _device.prosesor),
         (labelFor('motherboard', _device.category), _device.motherboard),
-        (labelFor('ram', _device.category), _device.ram),
-        (labelFor('storage', _device.category), _device.storage),
-        (labelFor('osWindows', _device.category), _device.osWindows),
-        (labelFor('goal', _device.category), _device.goal),
+        if (showSpecField('ram', _device.category))
+          (labelFor('ram', _device.category), _device.ram),
+        if (showSpecField('storage', _device.category))
+          (labelFor('storage', _device.category), _device.storage),
+        if (showSpecField('osWindows', _device.category))
+          (labelFor('osWindows', _device.category), _device.osWindows),
+        if (showSpecField('goal', _device.category))
+          (labelFor('goal', _device.category), _device.goal),
         (labelFor('perluUpgradeGanti', _device.category), _device.perluUpgradeGanti),
         (labelFor('perluUpgradeRepair', _device.category), _device.perluUpgradeRepair),
         (labelFor('statusUpgrade', _device.category), _device.statusUpgrade),

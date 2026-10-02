@@ -72,7 +72,7 @@ class _CategoryPickerPageState extends State<CategoryPickerPage> {
             icon: Icons.print,
             title: 'Printer',
             subtitle: 'Mesin cetak — form khusus detail printer\n'
-                '(Tipe/Model, Koneksi, PPM, Tray, Driver)',
+                '(Tipe/Model, Koneksi)',
             color: const Color(0xFFF59E0B),
             onTap: () => _pick('Printer'),
           ),
