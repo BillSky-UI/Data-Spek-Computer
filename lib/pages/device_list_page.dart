@@ -7,6 +7,7 @@ import '../services/settings_controller.dart';
 import '../theme/app_theme.dart';
 import '../utils/field_groups.dart';
 import '../widgets/app_popup_menu.dart';
+import '../widgets/clickable.dart';
 import 'category_picker_page.dart';
 import 'detail_page.dart';
 import 'device_form_page.dart';
@@ -136,7 +137,8 @@ class _DeviceListPageState extends State<DeviceListPage> {
       final selected = _filterCategory == value;
       return Padding(
         padding: const EdgeInsets.only(right: 8),
-        child: ChoiceChip(
+        child: Clickable(
+          child: ChoiceChip(
           selected: selected,
           showCheckmark: false,
           avatar: Icon(icon,
@@ -158,6 +160,7 @@ class _DeviceListPageState extends State<DeviceListPage> {
             _filterCategory = value;
             _applyFilter();
           }),
+          ),
         ),
       );
     }
@@ -225,6 +228,7 @@ class _DeviceListPageState extends State<DeviceListPage> {
           Row(
             children: [
               Expanded(
+                child: Clickable(
                 child: DropdownButtonFormField<String>(
                   initialValue: _filterBagian.isEmpty ? null : _filterBagian,
                   isExpanded: true,
@@ -256,6 +260,7 @@ class _DeviceListPageState extends State<DeviceListPage> {
                     _applyFilter();
                   }),
                 ),
+              ),
               ),
               const SizedBox(width: 8),
               Container(
@@ -392,85 +397,87 @@ class _DeviceListPageState extends State<DeviceListPage> {
 
   Widget _card(BuildContext context, Device d) {
     final c = context.appColors;
-    return GestureDetector(
-      onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => DetailPage(device: d)),
-        );
-        await _load();
-      },
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: c.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: c.border),
-          boxShadow: [
-            BoxShadow(
-                color: Color(0x22000000),
-                blurRadius: 10,
-                offset: const Offset(0, 4)),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [c.avatarGrad1, c.avatarGrad2],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+    return Clickable(
+      child: GestureDetector(
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => DetailPage(device: d)),
+          );
+          await _load();
+        },
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: c.border),
+            boxShadow: [
+              BoxShadow(
+                  color: Color(0x22000000),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4)),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [c.avatarGrad1, c.avatarGrad2],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                borderRadius: BorderRadius.circular(12),
+                alignment: Alignment.center,
+                child: Text(
+                  (d.deviceName.trim().isNotEmpty
+                          ? d.deviceName.trim()[0].toUpperCase()
+                          : '?'),
+                  style: TextStyle(
+                      color: c.avatarFg,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800),
+                ),
               ),
-              alignment: Alignment.center,
-              child: Text(
-                (d.deviceName.trim().isNotEmpty
-                        ? d.deviceName.trim()[0].toUpperCase()
-                        : '?'),
-                style: TextStyle(
-                    color: c.avatarFg,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${d.kodeInventaris} · ${display(d.deviceName)}',
+                      style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${display(d.bagian)}${d.plan.isNotEmpty ? ' · ${d.plan}' : ''}',
+                      style: TextStyle(color: c.textMuted, fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    '${d.kodeInventaris} · ${display(d.deviceName)}',
-                    style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '${display(d.bagian)}${d.plan.isNotEmpty ? ' · ${d.plan}' : ''}',
-                    style: TextStyle(color: c.textMuted, fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  _chip(context, categoryKey(d.category), c.blueFg, c.blue
+                      .withValues(alpha: 0.12), c.blue),
+                  const SizedBox(height: 5),
+                  _chip(context, d.plan.isEmpty ? '-' : d.plan, c.planChipFg,
+                      c.planChipBg, c.planChipBg),
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _chip(context, categoryKey(d.category), c.blueFg, c.blue
-                    .withValues(alpha: 0.12), c.blue),
-                const SizedBox(height: 5),
-                _chip(context, d.plan.isEmpty ? '-' : d.plan, c.planChipFg,
-                    c.planChipBg, c.planChipBg),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

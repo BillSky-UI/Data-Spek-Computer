@@ -7,6 +7,7 @@ import '../services/settings_controller.dart';
 import '../theme/app_theme.dart';
 import '../utils/field_groups.dart';
 import '../widgets/app_popup_menu.dart';
+import '../widgets/clickable.dart';
 import 'category_picker_page.dart';
 import 'device_form_page.dart';
 import 'scan_page.dart';
@@ -230,40 +231,44 @@ class _DashboardPageState extends State<DashboardPage> {
     return Row(
       children: [
         Expanded(
-          child: DropdownButtonFormField<String>(
-            initialValue: _filterBagian.isEmpty ? null : _filterBagian,
-            isExpanded: true,
-            dropdownColor: c.surface,
-            style: TextStyle(color: c.textPrimary, fontSize: 13),
-            decoration: deco('Semua Bagian'),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('Semua Bagian')),
-              ..._bagianList.map(
-                  (b) => DropdownMenuItem(value: b, child: Text(b))),
-            ],
-            onChanged: (v) => setState(() {
-              _filterBagian = v ?? '';
-              _applyFilters();
-            }),
+          child: Clickable(
+            child: DropdownButtonFormField<String>(
+              initialValue: _filterBagian.isEmpty ? null : _filterBagian,
+              isExpanded: true,
+              dropdownColor: c.surface,
+              style: TextStyle(color: c.textPrimary, fontSize: 13),
+              decoration: deco('Semua Bagian'),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Semua Bagian')),
+                ..._bagianList.map(
+                    (b) => DropdownMenuItem(value: b, child: Text(b))),
+              ],
+              onChanged: (v) => setState(() {
+                _filterBagian = v ?? '';
+                _applyFilters();
+              }),
+            ),
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: DropdownButtonFormField<String>(
-            initialValue: _filterPlan.isEmpty ? null : _filterPlan,
-            isExpanded: true,
-            dropdownColor: c.surface,
-            style: TextStyle(color: c.textPrimary, fontSize: 13),
-            decoration: deco('Semua PLAN'),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('Semua PLAN')),
-              ..._planList
-                  .map((p) => DropdownMenuItem(value: p, child: Text(p))),
-            ],
-            onChanged: (v) => setState(() {
-              _filterPlan = v ?? '';
-              _applyFilters();
-            }),
+          child: Clickable(
+            child: DropdownButtonFormField<String>(
+              initialValue: _filterPlan.isEmpty ? null : _filterPlan,
+              isExpanded: true,
+              dropdownColor: c.surface,
+              style: TextStyle(color: c.textPrimary, fontSize: 13),
+              decoration: deco('Semua PLAN'),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Semua PLAN')),
+                ..._planList
+                    .map((p) => DropdownMenuItem(value: p, child: Text(p))),
+              ],
+              onChanged: (v) => setState(() {
+                _filterPlan = v ?? '';
+                _applyFilters();
+              }),
+            ),
           ),
         ),
       ],
@@ -302,104 +307,106 @@ class _DashboardPageState extends State<DashboardPage> {
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => _openStickerDetail(),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: c.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: c.border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.sticky_note_2_outlined, size: 20, color: c.blue),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text('STATUS STIKER',
-                        style: TextStyle(
-                            color: c.textPrimary,
-                            fontSize: 13,
-                            letterSpacing: 0.5,
-                            fontWeight: FontWeight.w700)),
-                  ),
-                  Icon(Icons.chevron_right, color: c.textMuted, size: 20),
-                ],
-              ),
-              const SizedBox(height: 14),
-              total == 0
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Center(
-                          child: Text('Belum ada data perangkat',
-                              style: TextStyle(color: c.textMuted))),
-                    )
-                  : Row(
-                      children: [
-                        SizedBox(
-                          width: 140,
-                          height: 140,
-                          child: PieChart(
-                            PieChartData(
-                              sectionsSpace: 3,
-                              centerSpaceRadius: 40,
-                              sections: [
-                                PieChartSectionData(
-                                  value: sudah.toDouble(),
-                                  color: sudahColor,
-                                  radius: 44,
-                                  title:
-                                      sudah > 0 ? '${pct(sudah).round()}%' : '',
-                                  titleStyle: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800),
-                                ),
-                                PieChartSectionData(
-                                  value: belum.toDouble(),
-                                  color: belumColor,
-                                  radius: 44,
-                                  title:
-                                      belum > 0 ? '${pct(belum).round()}%' : '',
-                                  titleStyle: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800),
-                                ),
+      child: Clickable(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _openStickerDetail(),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: c.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: c.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.sticky_note_2_outlined, size: 20, color: c.blue),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text('STATUS STIKER',
+                          style: TextStyle(
+                              color: c.textPrimary,
+                              fontSize: 13,
+                              letterSpacing: 0.5,
+                              fontWeight: FontWeight.w700)),
+                    ),
+                    Icon(Icons.chevron_right, color: c.textMuted, size: 20),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                total == 0
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                            child: Text('Belum ada data perangkat',
+                                style: TextStyle(color: c.textMuted))),
+                      )
+                    : Row(
+                        children: [
+                          SizedBox(
+                            width: 140,
+                            height: 140,
+                            child: PieChart(
+                              PieChartData(
+                                sectionsSpace: 3,
+                                centerSpaceRadius: 40,
+                                sections: [
+                                  PieChartSectionData(
+                                    value: sudah.toDouble(),
+                                    color: sudahColor,
+                                    radius: 44,
+                                    title:
+                                        sudah > 0 ? '${pct(sudah).round()}%' : '',
+                                    titleStyle: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800),
+                                  ),
+                                  PieChartSectionData(
+                                    value: belum.toDouble(),
+                                    color: belumColor,
+                                    radius: 44,
+                                    title:
+                                        belum > 0 ? '${pct(belum).round()}%' : '',
+                                    titleStyle: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _legendRow(context,
+                                    color: sudahColor,
+                                    label: 'Sudah',
+                                    value:
+                                        '$sudah perangkat (${pct(sudah).toStringAsFixed(1)}%)'),
+                                const SizedBox(height: 10),
+                                _legendRow(context,
+                                    color: belumColor,
+                                    label: 'Belum',
+                                    value:
+                                        '$belum perangkat (${pct(belum).toStringAsFixed(1)}%)'),
+                                const SizedBox(height: 8),
+                                Text('Ketuk untuk lihat daftar device',
+                                    style: TextStyle(
+                                        color: c.textMuted, fontSize: 11)),
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _legendRow(context,
-                                  color: sudahColor,
-                                  label: 'Sudah',
-                                  value:
-                                      '$sudah perangkat (${pct(sudah).toStringAsFixed(1)}%)'),
-                              const SizedBox(height: 10),
-                              _legendRow(context,
-                                  color: belumColor,
-                                  label: 'Belum',
-                                  value:
-                                      '$belum perangkat (${pct(belum).toStringAsFixed(1)}%)'),
-                              const SizedBox(height: 8),
-                              Text('Ketuk untuk lihat daftar device',
-                                  style: TextStyle(
-                                      color: c.textMuted, fontSize: 11)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-            ],
+                        ],
+                      ),
+              ],
+            ),
           ),
         ),
       ),
@@ -480,84 +487,86 @@ class _DashboardPageState extends State<DashboardPage> {
     final total = data.values.fold<int>(0, (a, b) => a + b);
     final rows = data.entries.toList();
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: () => _openBreakdown(spec),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: c.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: c.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(spec.icon, size: 17, color: c.accent),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: Text(spec.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: c.textPrimary,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text('$total perangkat',
-                style: TextStyle(color: c.textMuted, fontSize: 11)),
-            const SizedBox(height: 6),
-            // Hanya 2 data teratas/utama pada tampilan awal.
-            for (final entry in rows.take(2))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 3),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(entry.key,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: c.textPrimary, fontSize: 12)),
-                    ),
-                    Text(entry.value.toString(),
+    return Clickable(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _openBreakdown(spec),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: c.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(spec.icon, size: 17, color: c.accent),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(spec.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            color: c.accent,
-                            fontSize: 12,
+                            color: c.textPrimary,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w700)),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('$total perangkat',
+                  style: TextStyle(color: c.textMuted, fontSize: 11)),
+              const SizedBox(height: 6),
+              // Hanya 2 data teratas/utama pada tampilan awal.
+              for (final entry in rows.take(2))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(entry.key,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: c.textPrimary, fontSize: 12)),
+                      ),
+                      Text(entry.value.toString(),
+                          style: TextStyle(
+                              color: c.accent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              if (rows.isEmpty || rows.length < 3)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(rows.isEmpty ? 'Belum ada variant terisi' : '',
+                      style: TextStyle(color: c.textMuted, fontSize: 11)),
+                ),
+              const Spacer(),
+              SizedBox(
+                width: double.infinity,
+                height: 34,
+                child: OutlinedButton(
+                  onPressed: () => _openBreakdown(spec),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: c.accent,
+                    side: BorderSide(color: c.accent, width: 1.2),
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(9)),
+                  ),
+                  child: const Text('Lihat Rincian',
+                      style: TextStyle(
+                          fontSize: 11.5, fontWeight: FontWeight.w700)),
                 ),
               ),
-            if (rows.isEmpty || rows.length < 3)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(rows.isEmpty ? 'Belum ada variant terisi' : '',
-                    style: TextStyle(color: c.textMuted, fontSize: 11)),
-              ),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              height: 34,
-              child: OutlinedButton(
-                onPressed: () => _openBreakdown(spec),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: c.accent,
-                  side: BorderSide(color: c.accent, width: 1.2),
-                  padding: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9)),
-                ),
-                child: const Text('Lihat Rincian',
-                    style: TextStyle(
-                        fontSize: 11.5, fontWeight: FontWeight.w700)),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

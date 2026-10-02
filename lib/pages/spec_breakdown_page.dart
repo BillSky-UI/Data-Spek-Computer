@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/device.dart';
 import '../theme/app_theme.dart';
+import '../widgets/clickable.dart';
 import 'variant_devices_page.dart';
 
 /// Rincian statistik per varian spesifikasi.
@@ -123,58 +124,60 @@ class SpecBreakdownPage extends StatelessWidget {
     final percent = total == 0 ? 0.0 : (entry.value / total * 100);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => _openVariant(context, entry.key),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: c.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: c.border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(entry.key,
+      child: Clickable(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _openVariant(context, entry.key),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: c.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: c.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(entry.key,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              TextStyle(color: c.textPrimary, fontSize: 13)),
+                    ),
+                    Text('${entry.value} (${percent.round()}%)',
+                        style: TextStyle(
+                            color:
+                                kChartColors[index % kChartColors.length],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: maxVal == 0 ? 0 : entry.value / maxVal,
+                    minHeight: 10,
+                    color: kChartColors[index % kChartColors.length],
+                    backgroundColor: c.surfaceAlt,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.list_alt, size: 13, color: c.blue),
+                    const SizedBox(width: 4),
+                    Text('Lihat device ($title → ${entry.key})',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style:
-                            TextStyle(color: c.textPrimary, fontSize: 13)),
-                  ),
-                  Text('${entry.value} (${percent.round()}%)',
-                      style: TextStyle(
-                          color:
-                              kChartColors[index % kChartColors.length],
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: maxVal == 0 ? 0 : entry.value / maxVal,
-                  minHeight: 10,
-                  color: kChartColors[index % kChartColors.length],
-                  backgroundColor: c.surfaceAlt,
+                        style: TextStyle(color: c.blue, fontSize: 11)),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(Icons.list_alt, size: 13, color: c.blue),
-                  const SizedBox(width: 4),
-                  Text('Lihat device ($title → ${entry.key})',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: c.blue, fontSize: 11)),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

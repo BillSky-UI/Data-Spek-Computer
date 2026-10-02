@@ -10,6 +10,43 @@ import '../models/device.dart';
 import '../services/pin_controller.dart';
 import 'local_database.dart';
 
+/// Hasil operasi hapus master (Bagian/PLAN).
+///
+/// [dipakai] berisi jumlah perangkat yang masih memakai nama tersebut, sehingga
+/// hapus ditolak dan UI bisa menjelaskan alasannya. [sudahAda] true bila nama
+/// baru bentrok dengan master lain (kolom `name` UNIQUE).
+class MasterHapusResult {
+  const MasterHapusResult({
+    required this.berhasil,
+    this.dipakai = 0,
+    this.sudahAda = false,
+  });
+
+  final bool berhasil;
+  final int dipakai;
+  final bool sudahAda;
+}
+
+/// Hasil operasi edit master (Bagian/PLAN).
+///
+/// [perangkatDiperbarui] = jumlah perangkat yang ikut di-rename mengikuti
+/// master yang diedit, sehingga data tidak lagi menunjuk nama lama.
+class MasterUbahResult {
+  const MasterUbahResult({
+    required this.berhasil,
+    this.perangkatDiperbarui = 0,
+    this.sudahAda = false,
+  });
+
+  final bool berhasil;
+  final int perangkatDiperbarui;
+  final bool sudahAda;
+}
+
+/// Dua nilai string dianggap sama bila berbeda hanya spasi / huruf besar-kecil.
+bool _samaNama(String a, String b) =>
+    a.trim().toLowerCase() == b.trim().toLowerCase();
+
 /// Repository data: Cloud (Supabase) + real-time, atau Local (SQLite) jika
 /// Supabase belum dikonfigurasi / gagal terhubung.
 ///
@@ -408,54 +445,80 @@ class DbHelper extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateBagian(String oldName, String newName) async {
-    if (localMode) {
-      final ok = await LocalDatabase.instance.updateBagian(oldName, newName);
-      if (ok) {
-        await _reloadLocalCache();
-        notifyListeners();
-      }
-      return ok;
+  Future<MasterUbahResult> updateBagian(String oldName, String newName) async {
+    final baru = newName.trim();
+    if (baru.isEmpty || _samaNama(baru, oldName)) {
+      return const MasterUbahResult(berhasil: false);
     }
-    if (_client == null) return false;
-    final trimmed = newName.trim();
-    if (trimmed.isEmpty) return false;
+    if (_bagianMaster.any((n) => _samaNama(n, baru))) {
+      return const MasterUbahResult(berhasil: false, sudahAda: true);
+    }
+    if (localMode) {
+      final ok = await LocalDatabase.instance.updateBagian(oldName, baru);
+      if (!ok) {
+        return const MasterUbahResult(berhasil: false, sudahAda: true);
+      }
+      // Data perangkat ikut di-rename supaya tidak tertinggal nama lama.
+      final n = await LocalDatabase.instance.renamePakai('bagian', oldName, baru);
+      await _reloadLocalCache();
+      notifyListeners();
+      return MasterUbahResult(berhasil: true, perangkatDiperbarui: n);
+    }
+    if (_client == null) return const MasterUbahResult(berhasil: false);
     final row = _bagianRows.firstWhere(
       (r) => (r['name'] ?? '').toString() == oldName,
       orElse: () => const {},
     );
     final id = row['id'];
-    if (id == null) return false;
+    if (id == null) return const MasterUbahResult(berhasil: false);
     try {
-      await _client!.from(_tBagian).update({'name': trimmed}).eq('id', id);
-      return true;
+      await _client!.from(_tBagian).update({'name': baru}).eq('id', id);
     } catch (_) {
-      return false;
+      return const MasterUbahResult(berhasil: false, sudahAda: true);
     }
+    final n = await _renameDevices('bagian', oldName, baru);
+    _bagianMaster = _bagianMaster
+        .map((n) => _samaNama(n, oldName) ? baru : n)
+        .toList()
+      ..sort();
+    _bagianRows = _bagianRows
+        .map((r) => (r['id'] == id ? {...r, 'name': baru} : r))
+        .toList();
+    notifyListeners();
+    return MasterUbahResult(berhasil: true, perangkatDiperbarui: n);
   }
 
-  Future<bool> deleteBagian(String name) async {
+  Future<MasterHapusResult> deleteBagian(String name) async {
+    // Bagian yang masih dipakai perangkat tidak boleh dihapus supaya data
+    // perangkat tidak menunjuk master yang sudah hilang.
+    final dipakai = await countPakaiBagian(name);
+    if (dipakai > 0) {
+      return MasterHapusResult(berhasil: false, dipakai: dipakai);
+    }
     if (localMode) {
       final ok = await LocalDatabase.instance.deleteBagian(name);
       if (ok) {
         await _reloadLocalCache();
         notifyListeners();
       }
-      return ok;
+      return MasterHapusResult(berhasil: ok);
     }
-    if (_client == null) return false;
+    if (_client == null) return const MasterHapusResult(berhasil: false);
     final row = _bagianRows.firstWhere(
       (r) => (r['name'] ?? '').toString() == name,
       orElse: () => const {},
     );
     final id = row['id'];
-    if (id == null) return false;
+    if (id == null) return const MasterHapusResult(berhasil: false);
     try {
       await _client!.from(_tBagian).delete().eq('id', id);
-      return true;
     } catch (_) {
-      return false;
+      return const MasterHapusResult(berhasil: false, sudahAda: true);
     }
+    _bagianMaster = _bagianMaster.where((n) => n != name).toList();
+    _bagianRows = _bagianRows.where((r) => r['id'] != id).toList();
+    notifyListeners();
+    return const MasterHapusResult(berhasil: true);
   }
 
   Future<bool> addPlan(String name) async {
@@ -491,50 +554,141 @@ class DbHelper extends ChangeNotifier {
     return List.of(_planMaster);
   }
 
-  Future<bool> updatePlan(String oldName, String newName) async {
-    final trimmed = newName.trim();
-    if (trimmed.isEmpty) return false;
+  Future<MasterUbahResult> updatePlan(String oldName, String newName) async {
+    final baru = newName.trim();
+    if (baru.isEmpty || _samaNama(baru, oldName)) {
+      return const MasterUbahResult(berhasil: false);
+    }
+    if (_planMaster.any((n) => _samaNama(n, baru))) {
+      return const MasterUbahResult(berhasil: false, sudahAda: true);
+    }
     if (localMode) {
-      final ok = await LocalDatabase.instance.updatePlan(oldName, trimmed);
-      if (ok) {
-        await _reloadLocalCache();
-        notifyListeners();
+      final ok = await LocalDatabase.instance.updatePlan(oldName, baru);
+      if (!ok) {
+        return const MasterUbahResult(berhasil: false, sudahAda: true);
       }
-      return ok;
-    }
-    if (_client == null) return false;
-    try {
-      await _client!.from(_tPlan).update({'name': trimmed}).eq('name', oldName);
-      _planMaster = _planMaster
-          .map((p) => p == oldName ? trimmed : p)
-          .toSet()
-          .toList()
-        ..sort();
+      final n = await LocalDatabase.instance.renamePakai('plan', oldName, baru);
+      await _reloadLocalCache();
       notifyListeners();
-      return true;
-    } catch (_) {
-      return false;
+      return MasterUbahResult(berhasil: true, perangkatDiperbarui: n);
     }
+    if (_client == null) return const MasterUbahResult(berhasil: false);
+    try {
+      await _client!.from(_tPlan).update({'name': baru}).eq('name', oldName);
+    } catch (_) {
+      return const MasterUbahResult(berhasil: false, sudahAda: true);
+    }
+    final n = await _renameDevices('plan', oldName, baru);
+    _planMaster = _planMaster
+        .map((p) => _samaNama(p, oldName) ? baru : p)
+        .toList()
+      ..sort();
+    notifyListeners();
+    return MasterUbahResult(berhasil: true, perangkatDiperbarui: n);
   }
 
-  Future<bool> deletePlan(String name) async {
+  Future<MasterHapusResult> deletePlan(String name) async {
+    final dipakai = await countPakaiPlan(name);
+    if (dipakai > 0) {
+      return MasterHapusResult(berhasil: false, dipakai: dipakai);
+    }
     if (localMode) {
       final ok = await LocalDatabase.instance.deletePlan(name);
       if (ok) {
         await _reloadLocalCache();
         notifyListeners();
       }
-      return ok;
+      return MasterHapusResult(berhasil: ok);
     }
-    if (_client == null) return false;
+    if (_client == null) return const MasterHapusResult(berhasil: false);
     try {
       await _client!.from(_tPlan).delete().eq('name', name);
-      _planMaster = _planMaster.where((p) => p != name).toList();
-      notifyListeners();
-      return true;
     } catch (_) {
-      return false;
+      return const MasterHapusResult(berhasil: false, sudahAda: true);
     }
+    _planMaster = _planMaster.where((p) => p != name).toList();
+    notifyListeners();
+    return const MasterHapusResult(berhasil: true);
+  }
+
+  /// Rename kolom [column] pada semua perangkat yang memakai [oldName], lalu
+  /// perbarui cache lokal. Mengembalikan jumlah perangkat yang terpengaruh.
+  ///
+  /// cloud: satu request `UPDATE ... WHERE id IN (...)` dengan id yang sudah
+  /// dicocokkan di memori, sehingga pencocokan tidak bergantung kepekaan huruf
+  /// besar-kecil milik PostgREST.
+  Future<int> _renameDevices(
+    String column,
+    String oldName,
+    String newName,
+  ) async {
+    final target = _devices.where((d) {
+      final nilai = column == 'bagian' ? d.bagian : d.plan;
+      return _samaNama(nilai, oldName);
+    }).toList();
+    if (target.isEmpty) return 0;
+    if (localMode) {
+      final n = await LocalDatabase.instance.renamePakai(column, oldName, newName);
+      await _reloadLocalCache();
+      return n;
+    }
+    final ids = target.map((d) => d.id).whereType<int>().toList();
+    if (ids.isNotEmpty && _client != null) {
+      try {
+        await _client!.from(_tDevices).update({column: newName}).inFilter('id', ids);
+      } catch (_) {
+        return 0;
+      }
+    }
+    for (final d in target) {
+      if (column == 'bagian') {
+        d.bagian = newName;
+      } else {
+        d.plan = newName;
+      }
+    }
+    _derivePlanMaster();
+    return target.length;
+  }
+
+  /// Jumlah perangkat yang memakai [name] pada kolom `bagian`.
+  Future<int> countPakaiBagian(String name) async {
+    if (name.trim().isEmpty) return 0;
+    if (localMode) return LocalDatabase.instance.countPakaiBagian(name);
+    return _devices.where((d) => _samaNama(d.bagian, name)).length;
+  }
+
+  /// Jumlah perangkat yang memakai [name] pada kolom `plan`.
+  Future<int> countPakaiPlan(String name) async {
+    if (name.trim().isEmpty) return 0;
+    if (localMode) return LocalDatabase.instance.countPakaiPlan(name);
+    return _devices.where((d) => _samaNama(d.plan, name)).length;
+  }
+
+  /// Peta `nama (lowercase) -> jumlah perangkat` untuk kolom `bagian`.
+  Future<Map<String, int>> petaPakaiBagian() async {
+    if (localMode) return _kunciLower(await LocalDatabase.instance.hitungPakai('bagian'));
+    return _pakaiDariCache((d) => d.bagian);
+  }
+
+  /// Peta `nama (lowercase) -> jumlah perangkat` untuk kolom `plan`.
+  Future<Map<String, int>> petaPakaiPlan() async {
+    if (localMode) return _kunciLower(await LocalDatabase.instance.hitungPakai('plan'));
+    return _pakaiDariCache((d) => d.plan);
+  }
+
+  static Map<String, int> _kunciLower(Map<String, int> src) => <String, int>{
+        for (final e in src.entries) e.key.trim().toLowerCase(): e.value,
+      };
+
+  Map<String, int> _pakaiDariCache(String Function(Device) kolom) {
+    final peta = <String, int>{};
+    for (final d in _devices) {
+      final key = kolom(d).trim().toLowerCase();
+      if (key.isEmpty) continue;
+      peta[key] = (peta[key] ?? 0) + 1;
+    }
+    return peta;
   }
 
   Future<List<String>> distinctBagian() async {

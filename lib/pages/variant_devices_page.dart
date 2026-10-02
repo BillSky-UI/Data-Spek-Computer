@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/device.dart';
 import '../theme/app_theme.dart';
 import '../utils/field_groups.dart';
+import '../widgets/clickable.dart';
 import 'detail_page.dart';
 
 /// Daftar device yang termasuk ke dalam satu varian spesifikasi.
@@ -110,53 +111,55 @@ class VariantDevicesPage extends StatelessWidget {
 
   Widget _row(BuildContext context, Device d, {required bool isLast}) {
     final c = context.appColors;
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => DetailPage(device: d)),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          border: isLast ? null : Border(bottom: BorderSide(color: c.border)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: c.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(9),
+    return Clickable(
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => DetailPage(device: d)),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            border: isLast ? null : Border(bottom: BorderSide(color: c.border)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: c.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(icon, size: 18, color: c.accent),
               ),
-              child: Icon(icon, size: 18, color: c.accent),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${d.kodeInventaris} · ${display(d.deviceName)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: c.textPrimary,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600)),
-                  if (d.bagian.trim().isNotEmpty)
-                    Text(display(d.bagian),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${d.kodeInventaris} · ${display(d.deviceName)}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style:
-                            TextStyle(color: c.textMuted, fontSize: 11.5)),
-                ],
+                        style: TextStyle(
+                            color: c.textPrimary,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600)),
+                    if (d.bagian.trim().isNotEmpty)
+                      Text(display(d.bagian),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              TextStyle(color: c.textMuted, fontSize: 11.5)),
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.chevron_right, color: c.textMuted, size: 20),
-          ],
+              Icon(Icons.chevron_right, color: c.textMuted, size: 20),
+            ],
+          ),
         ),
       ),
     );

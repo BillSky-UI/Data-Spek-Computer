@@ -5,6 +5,7 @@ import '../database/db_helper.dart';
 import '../pages/settings_page.dart';
 import '../services/export_service.dart';
 import '../services/settings_controller.dart';
+import 'clickable.dart';
 
 /// Ikon titik tiga (…) pada AppBar untuk Pengaturan, Export & Tentang.
 class AppPopupMenu extends StatelessWidget {
@@ -29,9 +30,10 @@ class AppPopupMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert),
-      onSelected: (value) {
+    return Clickable(
+      child: PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert),
+        onSelected: (value) {
         switch (value) {
           case 'settings':
             Navigator.push(
@@ -49,7 +51,8 @@ class AppPopupMenu extends StatelessWidget {
         PopupMenuItem(value: 'settings', child: Text('Pengaturan')),
         PopupMenuItem(value: 'export', child: Text('Export to Excel')),
         PopupMenuItem(value: 'about', child: Text('Tentang Aplikasi')),
-      ],
+        ],
+      ),
     );
   }
 

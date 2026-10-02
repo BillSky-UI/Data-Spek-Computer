@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/settings_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/cloud_status_banner.dart';
+import '../widgets/clickable.dart';
 import 'dashboard_page.dart';
 import 'device_list_page.dart';
 
@@ -32,7 +33,8 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: Clickable(
+        child: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         backgroundColor: c.surface,
@@ -51,6 +53,7 @@ class _MainShellState extends State<MainShell> {
             label: 'Dashboard',
           ),
         ],
+        ),
       ),
     );
   }

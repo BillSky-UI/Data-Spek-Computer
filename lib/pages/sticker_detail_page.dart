@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/device.dart';
 import '../theme/app_theme.dart';
 import '../utils/field_groups.dart';
+import '../widgets/clickable.dart';
 import 'detail_page.dart';
 
 /// Rincian Status Stiker: menampilkan daftar device yang stikernya
@@ -146,52 +147,54 @@ class StickerDetailPage extends StatelessWidget {
 
   Widget _row(BuildContext context, Device d, Color color, {required bool isLast}) {
     final c = context.appColors;
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => DetailPage(device: d)),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          border: isLast ? null : Border(bottom: BorderSide(color: c.border)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(9),
+    return Clickable(
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => DetailPage(device: d)),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            border: isLast ? null : Border(bottom: BorderSide(color: c.border)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(Icons.computer, size: 18, color: color),
               ),
-              child: Icon(Icons.computer, size: 18, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${d.kodeInventaris} · ${display(d.deviceName)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: c.textPrimary,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600)),
-                  if (d.bagian.trim().isNotEmpty)
-                    Text(display(d.bagian),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${d.kodeInventaris} · ${display(d.deviceName)}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: c.textMuted, fontSize: 11.5)),
-                ],
+                        style: TextStyle(
+                            color: c.textPrimary,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600)),
+                    if (d.bagian.trim().isNotEmpty)
+                      Text(display(d.bagian),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: c.textMuted, fontSize: 11.5)),
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.chevron_right, color: c.textMuted, size: 20),
-          ],
+              Icon(Icons.chevron_right, color: c.textMuted, size: 20),
+            ],
+          ),
         ),
       ),
     );

@@ -6,6 +6,7 @@ import '../services/export_service.dart';
 import '../services/saved_target.dart';
 import '../services/settings_controller.dart';
 import '../theme/app_theme.dart';
+import '../widgets/clickable.dart';
 import 'change_pin_page.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -189,26 +190,30 @@ class _SettingsPageState extends State<SettingsPage> {
       BuildContext context, ThemeMode mode, IconData icon, String label) {
     final c = context.appColors;
     final selected = _mode == mode;
-    return ListTile(
-      leading: Icon(icon, color: selected ? c.accent : c.textMuted),
-      title: Text(label, style: TextStyle(color: c.textPrimary)),
-      trailing: selected
-          ? Icon(Icons.check_circle, color: c.accent)
-          : Icon(Icons.circle_outlined, color: c.border),
-      onTap: () => _setTheme(mode),
+    return Clickable(
+      child: ListTile(
+        leading: Icon(icon, color: selected ? c.accent : c.textMuted),
+        title: Text(label, style: TextStyle(color: c.textPrimary)),
+        trailing: selected
+            ? Icon(Icons.check_circle, color: c.accent)
+            : Icon(Icons.circle_outlined, color: c.border),
+        onTap: () => _setTheme(mode),
+      ),
     );
   }
 
   Widget _actionTile(BuildContext context, IconData icon, String title,
       String subtitle, VoidCallback onTap) {
     final c = context.appColors;
-    return ListTile(
-      leading: Icon(icon, color: c.blue, size: 26),
-      title: Text(title, style: TextStyle(color: c.textPrimary, fontSize: 14)),
-      subtitle:
-          Text(subtitle, style: TextStyle(color: c.textMuted, fontSize: 12)),
-      trailing: Icon(Icons.chevron_right, color: c.textMuted),
-      onTap: onTap,
+    return Clickable(
+      child: ListTile(
+        leading: Icon(icon, color: c.blue, size: 26),
+        title: Text(title, style: TextStyle(color: c.textPrimary, fontSize: 14)),
+        subtitle:
+            Text(subtitle, style: TextStyle(color: c.textMuted, fontSize: 12)),
+        trailing: Icon(Icons.chevron_right, color: c.textMuted),
+        onTap: onTap,
+      ),
     );
   }
 
@@ -267,14 +272,16 @@ class _SettingsPageState extends State<SettingsPage> {
     required VoidCallback onTap,
   }) {
     final c = context.appColors;
-    return ListTile(
-      leading: Icon(icon, color: c.blue, size: 26),
-      title: Text(title, style: TextStyle(color: c.textPrimary, fontSize: 14)),
-      subtitle: Text(count == 0 ? 'Belum ada data' : '$count data tersimpan',
-          style: TextStyle(color: c.textMuted, fontSize: 12)),
-      trailing: Icon(expanded ? Icons.expand_less : Icons.expand_more,
-          color: c.textMuted),
-      onTap: onTap,
+    return Clickable(
+      child: ListTile(
+        leading: Icon(icon, color: c.blue, size: 26),
+        title: Text(title, style: TextStyle(color: c.textPrimary, fontSize: 14)),
+        subtitle: Text(count == 0 ? 'Belum ada data' : '$count data tersimpan',
+            style: TextStyle(color: c.textMuted, fontSize: 12)),
+        trailing: Icon(expanded ? Icons.expand_less : Icons.expand_more,
+            color: c.textMuted),
+        onTap: onTap,
+      ),
     );
   }
 
@@ -289,35 +296,50 @@ class _SettingsPageState extends State<SettingsPage> {
         )
       else
         for (var i = 0; i < _bagianList.length; i++)
-          ListTile(
-            dense: true,
-            leading: Icon(Icons.business_outlined, color: c.accent, size: 22),
-            title: Text(_bagianList[i],
-                style: TextStyle(color: c.textPrimary, fontSize: 14)),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: 'Edit bagian',
-                  icon: Icon(Icons.edit_outlined, color: c.blue, size: 20),
-                  onPressed: () => _showEditBagianDialog(_bagianList[i]),
-                ),
-                IconButton(
-                  tooltip: 'Hapus bagian',
-                  icon: Icon(Icons.delete_outline, color: c.danger, size: 20),
-                  onPressed: () => _deleteBagian(_bagianList[i]),
-                ),
-              ],
+          Clickable(
+            child: ListTile(
+              dense: true,
+              leading: Icon(Icons.business_outlined, color: c.accent, size: 22),
+              title: Text(_bagianList[i],
+                  style: TextStyle(color: c.textPrimary, fontSize: 14)),
+              subtitle:
+                  Text(_keteranganPemakai(_pakaiBagian, _bagianList[i]),
+                      style: TextStyle(color: c.textMuted, fontSize: 11)),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Edit bagian',
+                    icon: Icon(Icons.edit_outlined, color: c.blue, size: 20),
+                    onPressed: () => _showEditBagianDialog(_bagianList[i]),
+                  ),
+                  IconButton(
+                    tooltip: (_pakaiBagian[_key(_bagianList[i])] ?? 0) > 0
+                        ? 'Tidak bisa dihapus — masih dipakai perangkat'
+                        : 'Hapus bagian',
+                    icon: Icon(
+                      Icons.delete_outline,
+                      color: (_pakaiBagian[_key(_bagianList[i])] ?? 0) > 0
+                          ? c.textMuted
+                          : c.danger,
+                      size: 20,
+                    ),
+                    onPressed: () => _deleteBagian(_bagianList[i]),
+                  ),
+                ],
+              ),
             ),
           ),
       Divider(height: 1, color: c.border),
-      ListTile(
-        leading: Icon(Icons.add_circle_outline, color: c.blue, size: 24),
-        title: Text('Tambah Bagian Baru',
-            style: TextStyle(color: c.textPrimary, fontSize: 14)),
-        subtitle: Text('Nama bagian baru untuk pilihan di form',
-            style: TextStyle(color: c.textMuted, fontSize: 12)),
-        onTap: _showAddBagianDialog,
+      Clickable(
+        child: ListTile(
+          leading: Icon(Icons.add_circle_outline, color: c.blue, size: 24),
+          title: Text('Tambah Bagian Baru',
+              style: TextStyle(color: c.textPrimary, fontSize: 14)),
+          subtitle: Text('Nama bagian baru untuk pilihan di form',
+              style: TextStyle(color: c.textMuted, fontSize: 12)),
+          onTap: _showAddBagianDialog,
+        ),
       ),
     ];
   }
@@ -333,44 +355,70 @@ class _SettingsPageState extends State<SettingsPage> {
         )
       else
         for (var i = 0; i < _planList.length; i++)
-          ListTile(
-            dense: true,
-            leading:
-                Icon(Icons.account_tree_outlined, color: c.accent, size: 22),
-            title: Text(_planList[i],
-                style: TextStyle(color: c.textPrimary, fontSize: 14)),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: 'Edit PLAN',
-                  icon: Icon(Icons.edit_outlined, color: c.blue, size: 20),
-                  onPressed: () => _showEditPlanDialog(_planList[i]),
-                ),
-                IconButton(
-                  tooltip: 'Hapus PLAN',
-                  icon: Icon(Icons.delete_outline, color: c.danger, size: 20),
-                  onPressed: () => _deletePlan(_planList[i]),
-                ),
-              ],
+          Clickable(
+            child: ListTile(
+              dense: true,
+              leading:
+                  Icon(Icons.account_tree_outlined, color: c.accent, size: 22),
+              title: Text(_planList[i],
+                  style: TextStyle(color: c.textPrimary, fontSize: 14)),
+              subtitle: Text(_keteranganPemakai(_pakaiPlan, _planList[i]),
+                  style: TextStyle(color: c.textMuted, fontSize: 11)),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Edit PLAN',
+                    icon: Icon(Icons.edit_outlined, color: c.blue, size: 20),
+                    onPressed: () => _showEditPlanDialog(_planList[i]),
+                  ),
+                  IconButton(
+                    tooltip: (_pakaiPlan[_key(_planList[i])] ?? 0) > 0
+                        ? 'Tidak bisa dihapus — masih dipakai perangkat'
+                        : 'Hapus PLAN',
+                    icon: Icon(
+                      Icons.delete_outline,
+                      color: (_pakaiPlan[_key(_planList[i])] ?? 0) > 0
+                          ? c.textMuted
+                          : c.danger,
+                      size: 20,
+                    ),
+                    onPressed: () => _deletePlan(_planList[i]),
+                  ),
+                ],
+              ),
             ),
           ),
       Divider(height: 1, color: c.border),
-      ListTile(
-        leading: Icon(Icons.add_circle_outline, color: c.blue, size: 24),
-        title: Text('Tambah PLAN Baru',
-            style: TextStyle(color: c.textPrimary, fontSize: 14)),
-        subtitle: Text('PLAN ini muncul di dropdown form perangkat',
-            style: TextStyle(color: c.textMuted, fontSize: 12)),
-        onTap: _showAddPlanDialog,
+      Clickable(
+        child: ListTile(
+          leading: Icon(Icons.add_circle_outline, color: c.blue, size: 24),
+          title: Text('Tambah PLAN Baru',
+              style: TextStyle(color: c.textPrimary, fontSize: 14)),
+          subtitle: Text('PLAN ini muncul di dropdown form perangkat',
+              style: TextStyle(color: c.textMuted, fontSize: 12)),
+          onTap: _showAddPlanDialog,
+        ),
       ),
     ];
   }
 
   List<String> _bagianList = [];
   List<String> _planList = [];
+  /// Jumlah perangkat per nama (key lowercase) -> dipakai untuk挡住 hapus &
+  /// memberi tahu pengguna saat nama master diedit.
+  Map<String, int> _pakaiBagian = {};
+  Map<String, int> _pakaiPlan = {};
   bool _showBagian = false;
   bool _showPlan = false;
+
+  static String _key(String nama) => nama.trim().toLowerCase();
+
+  static String _keteranganPemakai(Map<String, int> peta, String nama) {
+    final n = peta[_key(nama)] ?? 0;
+    if (n == 0) return 'Belum dipakai perangkat';
+    return n == 1 ? 'Dipakai 1 perangkat' : 'Dipakai $n perangkat';
+  }
 
   @override
   void initState() {
@@ -394,12 +442,24 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _reloadBagian() async {
     final list = await DbHelper.instance.getBagianMaster();
-    if (mounted) setState(() => _bagianList = list);
+    final pakai = await DbHelper.instance.petaPakaiBagian();
+    if (mounted) {
+      setState(() {
+        _bagianList = list;
+        _pakaiBagian = pakai;
+      });
+    }
   }
 
   Future<void> _reloadPlan() async {
     final list = await DbHelper.instance.getPlanMaster();
-    if (mounted) setState(() => _planList = list);
+    final pakai = await DbHelper.instance.petaPakaiPlan();
+    if (mounted) {
+      setState(() {
+        _planList = list;
+        _pakaiPlan = pakai;
+      });
+    }
   }
 
   Future<void> _showAddBagianDialog() async {
@@ -433,16 +493,31 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _showEditBagianDialog(String oldName) async {
     final c = context.appColors;
+    final dipakai = _pakaiBagian[_key(oldName)] ?? 0;
     final controller = TextEditingController(text: oldName);
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Edit Bagian'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Nama bagian'),
-          style: TextStyle(color: c.textPrimary),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(hintText: 'Nama bagian'),
+              style: TextStyle(color: c.textPrimary),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              dipakai == 0
+                  ? 'Belum dipakai perangkat mana pun.'
+                  : 'Dipakai $dipakai perangkat. Nama di data perangkat '
+                      'otomatis ikut berubah mengikuti nama baru ini.',
+              style: TextStyle(color: c.textMuted, fontSize: 12),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -453,25 +528,44 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
       ),
     );
+    controller.dispose();
     if (result == null || result.trim().isEmpty || result.trim() == oldName) {
       return;
     }
-    final ok = await DbHelper.instance.updateBagian(oldName, result.trim());
+    final baru = result.trim();
+    final res = await DbHelper.instance.updateBagian(oldName, baru);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content:
-            Text(ok ? 'Bagian diperbarui (sinkron cloud)' : 'Gagal update bagian')));
+    final pesan = !res.berhasil
+        ? (res.sudahAda
+            ? 'Nama "$baru" sudah dipakai bagian lain'
+            : 'Gagal update bagian')
+        : (res.perangkatDiperbarui > 0
+            ? 'Bagian diubah menjadi "$baru" — ${res.perangkatDiperbarui} '
+                'perangkat ikut diperbarui'
+            : 'Bagian diperbarui menjadi "$baru"');
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(pesan)));
   }
 
   Future<void> _deleteBagian(String name) async {
+    final dipakai = _pakaiBagian[_key(name)] ?? 0;
+    // Master yang masih dipakai perangkat tidak boleh dihapus, karena data
+    // perangkat akan menunjuk nama yang sudah tidak ada di daftar.
+    if (dipakai > 0) {
+      await _blokirHapus(
+        jenis: 'Bagian',
+        name: name,
+        dipakai: dipakai,
+        onEdit: () => _showEditBagianDialog(name),
+      );
+      return;
+    }
     final c = context.appColors;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Hapus Bagian', style: TextStyle(fontSize: 17)),
         content: Text(
-          'Hapus bagian "$name"? Perangkat yang memakai bagian ini '
-          'tidak ikut terhapus.',
+          'Hapus bagian "$name"?',
           style: TextStyle(color: c.textMuted),
         ),
         actions: [
@@ -487,11 +581,43 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
     if (confirmed != true) return;
-    final ok = await DbHelper.instance.deleteBagian(name);
+    final res = await DbHelper.instance.deleteBagian(name);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content:
-            Text(ok ? 'Bagian dihapus (sinkron cloud)' : 'Gagal hapus bagian')));
+        content: Text(res.berhasil ? 'Bagian dihapus' : 'Gagal hapus bagian')));
+  }
+
+  /// Dialog penolakan hapus: nama masih dipakai perangkat.
+  Future<void> _blokirHapus({
+    required String jenis,
+    required String name,
+    required int dipakai,
+    required Future<void> Function() onEdit,
+  }) async {
+    final c = context.appColors;
+    final edit = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Tidak bisa hapus $jenis', style: TextStyle(fontSize: 17)),
+        content: Text(
+          '"$name" masih dipakai $dipakai perangkat sehingga tidak bisa '
+          'dihapus. Ubah dulu namanya — semua data perangkat yang memakai '
+          '"$name" akan ikut berubah mengikuti nama baru.',
+          style: TextStyle(color: c.textMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Batal', style: TextStyle(color: c.textMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Edit nama', style: TextStyle(color: c.blue)),
+          ),
+        ],
+      ),
+    );
+    if (edit == true) await onEdit();
   }
 
   // ---------- Master Data PLAN (CRUD, sinkron cloud) ----------
@@ -529,16 +655,31 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _showEditPlanDialog(String oldName) async {
     final c = context.appColors;
+    final dipakai = _pakaiPlan[_key(oldName)] ?? 0;
     final controller = TextEditingController(text: oldName);
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Edit PLAN'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Nama PLAN'),
-          style: TextStyle(color: c.textPrimary),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(hintText: 'Nama PLAN'),
+              style: TextStyle(color: c.textPrimary),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              dipakai == 0
+                  ? 'Belum dipakai perangkat mana pun.'
+                  : 'Dipakai $dipakai perangkat. Nama di data perangkat '
+                      'otomatis ikut berubah mengikuti nama baru ini.',
+              style: TextStyle(color: c.textMuted, fontSize: 12),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -553,22 +694,38 @@ class _SettingsPageState extends State<SettingsPage> {
     if (result == null || result.trim().isEmpty || result.trim() == oldName) {
       return;
     }
-    final ok = await DbHelper.instance.updatePlan(oldName, result.trim());
-    await _reloadPlan();
+    final baru = result.trim();
+    final res = await DbHelper.instance.updatePlan(oldName, baru);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(ok ? 'PLAN diperbarui' : 'Gagal update PLAN')));
+    final pesan = !res.berhasil
+        ? (res.sudahAda
+            ? 'Nama "$baru" sudah dipakai PLAN lain'
+            : 'Gagal update PLAN')
+        : (res.perangkatDiperbarui > 0
+            ? 'PLAN diubah menjadi "$baru" — ${res.perangkatDiperbarui} '
+                'perangkat ikut diperbarui'
+            : 'PLAN diperbarui menjadi "$baru"');
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(pesan)));
   }
 
   Future<void> _deletePlan(String name) async {
+    final dipakai = _pakaiPlan[_key(name)] ?? 0;
+    if (dipakai > 0) {
+      await _blokirHapus(
+        jenis: 'PLAN',
+        name: name,
+        dipakai: dipakai,
+        onEdit: () => _showEditPlanDialog(name),
+      );
+      return;
+    }
     final c = context.appColors;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Hapus PLAN', style: TextStyle(fontSize: 17)),
         content: Text(
-          'Hapus PLAN "$name"? Perangkat yang memakai PLAN ini '
-          'tidak ikut terhapus.',
+          'Hapus PLAN "$name"?',
           style: TextStyle(color: c.textMuted),
         ),
         actions: [
@@ -584,10 +741,9 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
     if (confirmed != true) return;
-    final ok = await DbHelper.instance.deletePlan(name);
-    await _reloadPlan();
+    final res = await DbHelper.instance.deletePlan(name);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(ok ? 'PLAN dihapus' : 'Gagal hapus PLAN')));
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res.berhasil ? 'PLAN dihapus' : 'Gagal hapus PLAN')));
   }
 }

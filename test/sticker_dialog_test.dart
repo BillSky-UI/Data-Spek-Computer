@@ -44,9 +44,9 @@ void main() {
     }
 
     expect(
-      find.text('Storage yang dicetak: 128 GB 3x + 256 GB 2x'),
+      find.text('Storage yang dicetak: 128GB 3x + 256GB 2x (5 unit)'),
       findsOneWidget,
-      reason: 'urutan mengikuti daftar ukuran, tiap ukuran punya jumlah unit',
+      reason: 'kapasitas dulu lalu jumlah unit, urutan mengikuti daftar ukuran',
     );
 
     // Kurangi 128 GB kembali ke 0 -> hilang dari ringkasan.
@@ -55,7 +55,7 @@ void main() {
       await tester.pump();
     }
     expect(
-      find.text('Storage yang dicetak: 256 GB 2x'),
+      find.text('Storage yang dicetak: 256GB 2x (2 unit)'),
       findsOneWidget,
     );
   });

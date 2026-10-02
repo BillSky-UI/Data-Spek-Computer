@@ -7,6 +7,7 @@ import '../services/public_saver_service.dart';
 import '../services/sticker_pdf_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/field_groups.dart';
+import 'clickable.dart';
 
 /// Dialog "Download Stiker PDF (Template)".
 ///
@@ -50,10 +51,20 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
       _d.kodeInventaris.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
   String get _fileName => 'Stiker_$_safeKode.pdf';
 
-  /// Tinggal format cetak untuk ukuran yang dipilih, misal "256 GB 2x".
-  String _formatStorage(String o, int n) => n == 1 ? o : '$o ${n}x';
+  /// Tinggal format cetak untuk ukuran yang dipilih.
+  ///
+  /// Kapasitas ditulis dulu lalu jumlah unitnya ("256GB 3x") supaya urutannya
+  /// sama dengan data asal di perangkat. Spasi antara angka dan satuan dihapus
+  /// agar ringkas saat dicetak, dan jumlah 1 unit tidak diulang.
+  String _formatStorage(String o, int n) {
+    final kapasitas = o.replaceAll(' ', '');
+    return n == 1 ? kapasitas : '$kapasitas ${n}x';
+  }
 
-  /// Ringkasan storage terpilih, misal "256 GB 2x + 128 GB 3x".
+  /// Total unit storage yang dicetak, untuk ringkasan di bawah daftar.
+  int get _totalUnit => _storageCount.values.fold(0, (a, b) => a + b);
+
+  /// Ringkasan storage terpilih, misal "256GB 3x + 128GB 2x".
   String get _storageTerpilih => _storageOptions
       .where((o) => (_storageCount[o] ?? 0) > 0)
       .map((o) => _formatStorage(o, _storageCount[o]!))
@@ -141,38 +152,61 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
   }
 
   /// Satu baris ukuran storage: label + stepper jumlah unit (- 0 +).
+  /// Barisnya bisa diklik untuk menambah 1 unit, jadi tidak harus Precis ke
+  /// tombol "+" di layar sentuh.
   Widget _storageRow(String o, int n) {
     final c = context.appColors;
     final dipakai = n > 0;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              o,
-              style: TextStyle(
-                color: dipakai ? c.textPrimary : c.textMuted,
-                fontSize: 12,
-                fontWeight: dipakai ? FontWeight.w700 : FontWeight.w400,
+    return Material(
+      color: dipakai ? c.blue.withValues(alpha: 0.08) : Colors.transparent,
+      child: Clickable(
+        child: InkWell(
+        onTap: () => _ubahStorage(o, 1),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  o,
+                  style: TextStyle(
+                    color: dipakai ? c.textPrimary : c.textMuted,
+                    fontSize: 12,
+                    fontWeight: dipakai ? FontWeight.w700 : FontWeight.w400,
+                  ),
+                ),
               ),
-            ),
-          ),
-          _stepper(icon: Icons.remove, onTap: n > 0 ? () => _ubahStorage(o, -1) : null),
-          SizedBox(
-            width: 26,
-            child: Text(
-              '$n',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: dipakai ? c.textPrimary : c.textMuted,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
+              if (dipakai)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Text(
+                    _formatStorage(o, n),
+                    style: TextStyle(
+                      color: c.blue,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              _stepper(
+                  icon: Icons.remove, onTap: n > 0 ? () => _ubahStorage(o, -1) : null),
+              SizedBox(
+                width: 26,
+                child: Text(
+                  '$n',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: dipakai ? c.textPrimary : c.textMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
-            ),
+              _stepper(icon: Icons.add, onTap: () => _ubahStorage(o, 1)),
+            ],
           ),
-          _stepper(icon: Icons.add, onTap: () => _ubahStorage(o, 1)),
-        ],
+        ),
+        ),
       ),
     );
   }
@@ -182,7 +216,8 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
     return Material(
       color: c.surfaceAlt,
       borderRadius: BorderRadius.circular(8),
-      child: InkWell(
+      child: Clickable(
+        child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: SizedBox(
@@ -193,6 +228,7 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
             size: 16,
             color: onTap == null ? c.textMuted.withValues(alpha: 0.35) : c.blue,
           ),
+        ),
         ),
       ),
     );
@@ -315,8 +351,7 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  "Atur jumlah unit tiap ukuran — misalnya \"256 GB\" ada 2, "
-                  '"128 GB" ada 3.',
+                  'Ketuk baris untuk +1 unit, atau pakai tombol - / +.',
                   style: TextStyle(color: c.textMuted, fontSize: 11),
                 ),
                 const SizedBox(height: 10),
@@ -344,7 +379,8 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
                   _storageTerpilih.isEmpty
                       ? 'Akan mengikuti data input: '
                           '${_d.storage.trim().isEmpty ? '(kosong)' : _d.storage.trim()}'
-                      : 'Storage yang dicetak: $_storageTerpilih',
+                      : 'Storage yang dicetak: $_storageTerpilih '
+                          '($_totalUnit unit)',
                   style: TextStyle(color: c.textMuted, fontSize: 11),
                 ),
               ],

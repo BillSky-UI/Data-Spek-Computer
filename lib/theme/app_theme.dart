@@ -297,6 +297,11 @@ class AppTheme {
         ),
       );
 
+  /// Kursor "pointer/tangan" untuk semua elemen yang bisa diklik, supaya di
+  /// web/desktop area interaktif tidak terlihat seperti teks biasa.
+  static const WidgetStateProperty<MouseCursor?> kClickCursor =
+      WidgetStatePropertyAll<MouseCursor?>(SystemMouseCursors.click);
+
   /// Provider warna tombol saat ditekan (partial-opacity hover/pressed).
   static WidgetStateProperty<Color?> accentOn(Color accent) =>
       WidgetStateProperty.resolveWith((states) =>
@@ -405,7 +410,16 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-        ),
+        ).copyWith(mouseCursor: kClickCursor),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          minimumSize: const Size(0, 46),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ).copyWith(mouseCursor: kClickCursor),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
@@ -417,11 +431,17 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-        ),
+        ).copyWith(mouseCursor: kClickCursor),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: colors.blue),
+        style: TextButton.styleFrom(
+          foregroundColor: colors.blue,
+        ).copyWith(mouseCursor: kClickCursor),
       ),
+      iconButtonTheme: IconButtonThemeData(
+        style: ButtonStyle(mouseCursor: kClickCursor),
+      ),
+      
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: colors.surface,

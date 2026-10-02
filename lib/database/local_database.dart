@@ -244,6 +244,56 @@ class LocalDatabase {
         .toList();
   }
 
+  /// Berapa perangkat yang masih memakai [name] pada kolom `bagian`.
+  Future<int> countPakaiBagian(String name) =>
+      _countPakai('bagian', name);
+
+  /// Berapa perangkat yang masih memakai [name] pada kolom `plan`.
+  Future<int> countPakaiPlan(String name) => _countPakai('plan', name);
+
+  Future<int> _countPakai(String column, String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return 0;
+    final db = await database;
+    final rows = await db.rawQuery(
+      'SELECT COUNT(*) AS jml FROM $_tableDevices '
+      "WHERE $column IS NOT NULL AND TRIM($column) = ? COLLATE NOCASE",
+      <Object?>[trimmed],
+    );
+    return Sqflite.firstIntValue(rows) ?? 0;
+  }
+
+  /// Peta jumlah perangkat per nilai [column] (mis. "keuangan" -> 12) dalam
+  /// satu query, dipakai halaman Pengaturan untuk menandai master yang masih
+  /// dipakai sehingga tidak bisa dihapus.
+  Future<Map<String, int>> hitungPakai(String column) async {
+    final db = await database;
+    final rows = await db.rawQuery(
+      'SELECT TRIM($column) AS nama, COUNT(*) AS jml FROM $_tableDevices '
+      "WHERE $column IS NOT NULL AND TRIM($column) != '' "
+      'GROUP BY TRIM($column)',
+    );
+    return <String, int>{
+      for (final r in rows)
+        (r['nama'] ?? '').toString(): (r['jml'] as num?)?.toInt() ?? 0,
+    };
+  }
+
+  /// Rename [column] milik semua perangkat yang memakai [oldName] → [newName].
+  /// Dipakai saat nama Bagian/PLAN master diedit supaya data ikut menyesuaikan.
+  Future<int> renamePakai(String column, String oldName, String newName) async {
+    final dari = oldName.trim();
+    final ke = newName.trim();
+    if (dari.isEmpty || ke.isEmpty || dari == ke) return 0;
+    final db = await database;
+    return db.update(
+      _tableDevices,
+      <String, Object?>{column: ke},
+      where: 'TRIM($column) = ? COLLATE NOCASE',
+      whereArgs: <Object?>[dari],
+    );
+  }
+
   Future<bool> addBagian(String name) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return false;
@@ -261,9 +311,13 @@ class LocalDatabase {
     final trimmed = newName.trim();
     if (trimmed.isEmpty) return false;
     final db = await database;
-    final n = await db.update(_tableBagian, {'name': trimmed},
-        where: 'name = ?', whereArgs: [oldName]);
-    return n > 0;
+    try {
+      final n = await db.update(_tableBagian, {'name': trimmed},
+          where: 'name = ?', whereArgs: [oldName]);
+      return n > 0;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<bool> deleteBagian(String name) async {
@@ -289,9 +343,13 @@ class LocalDatabase {
     final trimmed = newName.trim();
     if (trimmed.isEmpty) return false;
     final db = await database;
-    final n = await db.update(_tablePlan, {'name': trimmed},
-        where: 'name = ?', whereArgs: [oldName]);
-    return n > 0;
+    try {
+      final n = await db.update(_tablePlan, {'name': trimmed},
+          where: 'name = ?', whereArgs: [oldName]);
+      return n > 0;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<bool> deletePlan(String name) async {

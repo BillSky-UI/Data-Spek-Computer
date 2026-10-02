@@ -4,6 +4,7 @@ import '../database/db_helper.dart';
 import '../models/device.dart';
 import '../theme/app_theme.dart';
 import '../utils/field_groups.dart';
+import '../widgets/clickable.dart';
 
 class DeviceFormPage extends StatefulWidget {
   final Device? device;
@@ -433,8 +434,9 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         children: [
           Text(label, style: TextStyle(color: c.textMuted, fontSize: 13)),
           const SizedBox(height: 5),
-          DropdownButtonFormField<String>(
-            initialValue: value.isEmpty ? null : value,
+          Clickable(
+            child: DropdownButtonFormField<String>(
+              initialValue: value.isEmpty ? null : value,
             isExpanded: true,
             dropdownColor: c.surface,
             style: TextStyle(color: c.textPrimary, fontSize: 14),
@@ -463,6 +465,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                   .map((o) => DropdownMenuItem(value: o, child: Text(o))),
             ],
             onChanged: onChanged,
+            ),
           ),
         ],
       ),
@@ -483,7 +486,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         children: [
           Text(label, style: TextStyle(color: c.textMuted, fontSize: 13)),
           const SizedBox(height: 5),
-          TextFormField(
+          Clickable(
+            child: TextFormField(
             controller: ctr,
             readOnly: onTap != null,
             onTap: onTap,
@@ -515,6 +519,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                 borderSide: BorderSide(color: c.accent, width: 1.5),
               ),
             ),
+          ),
           ),
         ],
       ),
