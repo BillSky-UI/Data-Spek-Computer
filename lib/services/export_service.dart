@@ -7,6 +7,25 @@ import '../models/device.dart';
 import '../utils/field_groups.dart';
 import 'public_saver_service.dart';
 
+/// Satu kolom tabel pada sheet Excel.
+///
+/// [group] adalah judul kelompok yang di-merge di header baris pertama
+/// (mis. "Spesifikasi Saat Ini"); null berarti judul kolom tunggal yang
+/// di-merge vertikal dua baris.
+class _Column {
+  const _Column({
+    required this.label,
+    required this.value,
+    this.group,
+    this.width = 18,
+  });
+
+  final String label;
+  final String Function(Device) value;
+  final String? group;
+  final double width;
+}
+
 /// Export data inventaris ke Excel multi-sheet dengan kop perusahaan.
 ///
 /// Mengikuti format tata letak master
@@ -28,79 +47,80 @@ class ExportService {
   static String _titleFor(String category) =>
       'Quality of Devices ($category)';
 
-  /// Header tabel (baris 1) — mengikuti master + kolom "Status Stiker"
-  /// yang ditambahkan di akhir.
-  static const _groupHeaders = {
-    1: 'Tanggal Evaluasi',
-    2: 'Kode Inventaris',
-    3: 'PLAN',
-    4: 'Bagian',
-    5: 'Device Name',
-    6: 'Category',
-    7: 'Spesifikasi Saat Ini',
-    12: 'Goal',
-    13: 'Perlu Upgrade',
-    15: 'Status Upgrade',
-    16: 'Keterangan',
-    17: 'Status Stiker',
-  };
+  /// Kolom tabel untuk sebuah sheet.
+  ///
+  /// Hanya field yang benar-benar diinput pada form kategori tersebut yang
+  /// ikut diekspor: printer tidak punya RAM/Storage/OS/Goal, jadi sheet
+  /// Printer tidak ikut membawa kolom kosong tersebut.
+  ///
+  /// Sheet Computer dan Laptop memakai nama kolom versi master (bahasa Inggris)
+  /// supaya formatnya tetap sama dengan arsip Excel lama. Sheet Printer memakai
+  /// istilah printer lewat [printerSpecLabel].
+  static List<_Column> _columnsFor(String category) {
+    final isPrinter = categoryKey(category) == 'Printer';
+    _Column spec(String label, String Function(Device) getter, double width) =>
+        _Column(
+          group: 'Spesifikasi Saat Ini',
+          label: label,
+          value: getter,
+          width: width,
+        );
 
-  /// Sub-header (baris 2) untuk kolom yang punya kelompok di atasnya.
-  static const _subHeaders = {
-    7: 'Processor',
-    8: 'Motherboard',
-    9: 'RAM',
-    10: 'Storage',
-    11: 'OS Windows',
-    13: 'Ganti',
-    14: 'Repair',
-  };
+    return [
+      _Column(
+          label: 'Tanggal Evaluasi',
+          value: (d) => d.tanggalEvaluasi,
+          width: 13),
+      _Column(label: 'Kode Inventaris', value: (d) => d.kodeInventaris, width: 12),
+      _Column(label: 'PLAN', value: (d) => d.plan, width: 8),
+      _Column(label: 'Bagian', value: (d) => d.bagian, width: 16),
+      _Column(label: 'Device Name', value: (d) => d.deviceName, width: 18),
+      _Column(
+          label: 'Category',
+          value: (d) => categoryKey(d.category),
+          width: 10),
+      spec(
+          isPrinter ? printerSpecLabel('prosesor') : 'Processor',
+          (d) => d.prosesor,
+          38),
+      spec(
+          isPrinter ? printerSpecLabel('motherboard') : 'Motherboard',
+          (d) => d.motherboard,
+          30),
+      if (showSpecField('ram', category)) spec('RAM', (d) => d.ram, 12),
+      if (showSpecField('storage', category))
+        spec('Storage', (d) => d.storage, 20),
+      if (showSpecField('osWindows', category))
+        spec('OS Windows', (d) => d.osWindows, 34),
+      if (showSpecField('goal', category))
+        _Column(label: 'Goal', value: (d) => d.goal, width: 10),
+      _Column(
+        group: 'Perlu Upgrade',
+        label: 'Ganti',
+        value: _perluGanti,
+        width: 12,
+      ),
+      _Column(
+        group: 'Perlu Upgrade',
+        label: 'Repair',
+        value: _perluRepair,
+        width: 10,
+      ),
+      _Column(
+          label: labelFor('statusUpgrade', category),
+          value: (d) => d.statusUpgrade,
+          width: 12),
+      _Column(label: 'Keterangan', value: (d) => d.keterangan, width: 22),
+      _Column(label: 'Status Stiker', value: (d) => d.statusStiker, width: 11),
+    ];
+  }
 
-  /// Kolom tunggal pada header dua baris (di-merge vertikal row1:row2).
-  static const _singleCols = [1, 2, 3, 4, 5, 6, 12, 15, 16, 17];
+  static String _perluGanti(Device d) => d.perluUpgradeGanti;
+
+  static String _perluRepair(Device d) => d.perluUpgradeRepair;
 
   static const String _mimeXlsx =
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-  static const _headers = [
-    'Tanggal Evaluasi',
-    'Kode Inventaris',
-    'PLAN',
-    'Bagian',
-    'Device Name',
-    'Category',
-    'Spesifikasi Saat Ini - Processor',
-    'Spesifikasi Saat Ini - Motherboard',
-    'Spesifikasi Saat Ini - RAM',
-    'Spesifikasi Saat Ini - Storage',
-    'Spesifikasi Saat Ini - OS Windows',
-    'Goal',
-    'Perlu Upgrade - Ganti',
-    'Perlu Upgrade - Repair',
-    'Status Upgrade',
-    'Keterangan',
-    'Status Stiker',
-  ];
-
-  static List<String> _values(Device d) => [
-        d.tanggalEvaluasi,
-        d.kodeInventaris,
-        d.plan,
-        d.bagian,
-        d.deviceName,
-        categoryKey(d.category),
-        d.prosesor,
-        d.motherboard,
-        d.ram,
-        d.storage,
-        d.osWindows,
-        d.goal,
-        d.perluUpgradeGanti,
-        d.perluUpgradeRepair,
-        d.statusUpgrade,
-        d.keterangan,
-        d.statusStiker,
-      ];
 
   /// Kelompokkan perangkat ke sheet sesuai kategori.
   static Map<String, List<Device>> _groupBy(List<Device> devices) {
@@ -170,64 +190,76 @@ class ExportService {
     for (final row in rows) {
       sheet.appendRow(row.map((v) => v == null ? null : excel_pkg.TextCellValue(v)).toList());
     }
-    _applyLayout(sheet);
+    _applyLayout(sheet, category);
   }
 
   /// Susun baris mentah (kop + header 2 baris + data). Nilai diisi sebagai
-  /// string; null = kosong. Data dimulai dari kolom 1 (B) seperti master.
+  /// string; null = kosong. Data dimulai dari kolom 1 (B) seperti master,
+  /// jumlah kolom mengikuti [_columnsFor] kategori sheet tersebut.
   static List<List<String?>> _rowsFor(
       String category, String periode, List<Device> devices) {
-    final rows = <List<String?>>[
-      List<String?>.filled(18, null), // R0 spacer
-      [ // R1 judul + periode
-        null, null, _titleFor(category), null, null, null, null, null,
-        null, null, null, null, null, periode, null, null, null, null,
-      ], // title col2, periode col13
-      List<String?>.filled(18, null), // R2 spacer
-      [ // R3 perusahaan
-        null, _company, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null,
-      ],
-      List<String?>.filled(18, null), // R4 spacer
-      [ // R5 baris header utama
-        null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null,
-      ],
-      List<String?>.filled(18, null), // R6 baris sub-header
-    ];
+    final cols = _columnsFor(category);
+    final width = cols.length + 1; // +1 kolom kosong di kiri (seperti master)
+    final last = cols.length; // kolom data terakhir
+    final blank = List<String?>.filled(width, null);
 
-    // Isi header utama (kolom 1..17).
-    for (var col = 1; col <= 17; col++) {
-      rows[5][col] = _groupHeaders[col];
-      rows[6][col] = _subHeaders[col];
+    String? groupFor(_Column col) {
+      if (col.group == null) return null;
+      final i = cols.indexOf(col);
+      final before = i > 0 ? cols[i - 1].group : null;
+      return before == col.group ? null : col.group;
     }
+
+    // R1: judul laporan di kiri, periode di empat kolom terakhir.
+    final kop = List<String?>.filled(width, null);
+    kop[2] = _titleFor(category);
+    kop[last - 4] = periode;
+
+    final rows = <List<String?>>[
+      blank, // R0 spacer
+      kop, // R1 judul + periode
+      blank, // R2 spacer
+      [null, _company, ...List<String?>.filled(width - 2, null)], // R3 perusahaan
+      blank, // R4 spacer
+      // R5 kelompok header, R6 judul kolom.
+      [for (final col in cols) groupFor(col)]..insert(0, null),
+      [for (final col in cols) col.label]..insert(0, null),
+    ];
 
     // Baris data mulai dari index 7.
     for (final d in devices) {
-      rows.add([null, ..._values(d)]);
+      rows.add([null, ...cols.map((c) => c.value(d))]);
     }
     return rows;
   }
 
-  static void _applyLayout(excel_pkg.Sheet sheet) {
+  static void _applyLayout(excel_pkg.Sheet sheet, String category) {
+    final cols = _columnsFor(category);
+    final last = cols.length; // kolom data terakhir (1-based)
+    final singles = <int>[
+      for (var i = 0; i < cols.length; i++)
+        if (cols[i].group == null) i + 1,
+    ];
+
     // Lebar kolom menyesuaikan isi.
-    final widths = <int, double>{
-      1: 13, 2: 12, 3: 8, 4: 16, 5: 18, 6: 10,
-      7: 38, 8: 30, 9: 12, 10: 20, 11: 34,
-      12: 10, 13: 12, 14: 10, 15: 12, 16: 22, 17: 11,
-    };
-    widths.forEach(sheet.setColumnWidth);
+    for (var i = 0; i < cols.length; i++) {
+      sheet.setColumnWidth(i + 1, cols[i].width);
+    }
 
     // Merge kop.
-    _merge(sheet, 2, 1, 12, 1); // judul laporan
-    _merge(sheet, 13, 1, 17, 1); // periode
-    _merge(sheet, 1, 3, 17, 3); // perusahaan
-    // Merge kelompok header.
-    _merge(sheet, 7, 5, 11, 5); // Spesifikasi Saat Ini
-    _merge(sheet, 13, 5, 14, 5); // Perlu Upgrade
-    // Header kolom tunggal merge vertikal row5:row6.
-    for (final col in _singleCols) {
-      _merge(sheet, col, 5, col, 6);
+    _merge(sheet, 2, 1, last - 5, 1); // judul laporan
+    _merge(sheet, last - 4, 1, last, 1); // periode
+    _merge(sheet, 1, 3, last, 3); // perusahaan
+    // Merge kelompok header (kolom berurutan dengan group sama).
+    for (var i = 0; i < cols.length; i++) {
+      final group = cols[i].group;
+      if (group == null) continue;
+      var end = i;
+      while (end + 1 < cols.length && cols[end + 1].group == group) {
+        end++;
+      }
+      _merge(sheet, i + 1, 5, end + 1, 5);
+      i = end;
     }
 
     // Style.
@@ -275,13 +307,15 @@ class ExportService {
 
     // Kop.
     _styleCell(sheet, 2, 1, titleStyle);
-    _styleCell(sheet, 13, 1, periodeStyle);
+    _styleCell(sheet, last - 4, 1, periodeStyle);
     _styleCell(sheet, 1, 3, companyStyle);
 
     // Header baris 5 & 6.
-    for (var col = 1; col <= 17; col++) {
+    for (var col = 1; col <= last; col++) {
       _styleCell(sheet, col, 5, headerStyle);
-      if (_subHeaders.containsKey(col)) {
+      if (singles.contains(col)) {
+        _merge(sheet, col, 5, col, 6);
+      } else {
         _styleCell(sheet, col, 6, headerStyle);
       }
     }
@@ -301,7 +335,7 @@ class ExportService {
         topBorder: bodyBorder,
         bottomBorder: bodyBorder,
       );
-      for (var col = 1; col <= 17; col++) {
+      for (var col = 1; col <= last; col++) {
         _styleCell(sheet, col, r, style);
       }
     }
@@ -330,11 +364,16 @@ class ExportService {
 
   Uint8List buildCsvBytes(List<Device> devices) => _buildCsv(devices);
 
+  /// CSV tetap memakai satu header untuk semua perangkat: kolom diambil dari
+  /// kategori Computer yang paling lengkap, supaya semua baris Sejajar.
   static Uint8List _buildCsv(List<Device> devices) {
+    final cols = _columnsFor(_sheetOrder.first);
     final buf = StringBuffer();
-    buf.writeln(_headers.map(_csvEncode).join(';'));
+    buf.writeln(
+      cols.map((c) => c.group == null ? c.label : '${c.group} - ${c.label}').map(_csvEncode).join(';'),
+    );
     for (final d in devices) {
-      buf.writeln(_values(d).map(_csvEncode).join(';'));
+      buf.writeln(cols.map((c) => _csvEncode(c.value(d))).join(';'));
     }
     // UTF-8 BOM agar karakter Indonesia terbaca benar di Excel.
     final bom = const [0xEF, 0xBB, 0xBF];

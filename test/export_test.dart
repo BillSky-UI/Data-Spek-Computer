@@ -64,8 +64,20 @@ void main() {
           reason: 'Judul laporan harus sesuai kategori $name');
       expect(text, contains('Kode Inventaris'), reason: 'Header kolom');
       expect(text, contains('Device Name'), reason: 'Header kolom');
-      expect(text, contains('Processor'), reason: 'Sub-header Spesifikasi');
       expect(text, contains('Status Stiker'), reason: 'Kolom terakhir');
+    }
+
+    // Computer & Laptop memakai kolom spesifikasi PC.
+    for (final name in ['Computer', 'Laptop']) {
+      final text = excel.tables[name]!.rows
+          .expand((r) => r.where((c) => c?.value != null))
+          .map((c) => c!.value.toString())
+          .join(' ');
+      expect(text, contains('Processor'), reason: 'Sub-header Spesifikasi $name');
+      expect(text, contains('Motherboard'), reason: 'Sub-header Spesifikasi $name');
+      expect(text, contains('RAM'), reason: 'Kolom spesifikasi $name');
+      expect(text, contains('Storage'), reason: 'Kolom spesifikasi $name');
+      expect(text, contains('OS Windows'), reason: 'Kolom spesifikasi $name');
     }
 
     // Data masuk ke sheet kategori yang tepat.
@@ -91,6 +103,17 @@ void main() {
         .map((c) => c!.value.toString())
         .join(' ');
     expect(priText, contains('TES PRINTER'));
+    // Printer hanya punya field yang diinput di form printer.
+    expect(priText, contains('Tipe / Model Printer'));
+    expect(priText, contains('Metode Koneksi'));
+    expect(priText, isNot(contains('RAM')),
+        reason: 'Sheet Printer tidak boleh membawa kolom RAM');
+    expect(priText, isNot(contains('Storage')),
+        reason: 'Sheet Printer tidak boleh membawa kolom Storage');
+    expect(priText, isNot(contains('OS Windows')),
+        reason: 'Sheet Printer tidak boleh membawa kolom OS Windows');
+    expect(priText, isNot(contains('Goal')),
+        reason: 'Sheet Printer tidak boleh membawa kolom Goal');
   });
 
   test('buildCsvBytes memuat header dan baris data dengan BOM', () {

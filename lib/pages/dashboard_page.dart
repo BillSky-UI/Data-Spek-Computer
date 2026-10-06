@@ -40,6 +40,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   String _filterBagian = '';
   String _filterPlan = '';
+  String _filterKategori = '';
   bool _loading = true;
 
   // Susunan 2 kolom: Processor-Motherboard, Storage-RAM, OS-Category.
@@ -103,9 +104,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
   void _applyFilters() {
     _filtered = _all.where((d) {
+      final matchKategori = _filterKategori.isEmpty ||
+          categoryKey(d.category) == _filterKategori;
       final matchBagian = _filterBagian.isEmpty || d.bagian == _filterBagian;
       final matchPlan = _filterPlan.isEmpty || d.plan == _filterPlan;
-      return matchBagian && matchPlan;
+      return matchKategori && matchBagian && matchPlan;
     }).toList();
   }
 
@@ -228,50 +231,110 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         );
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Clickable(
-            child: DropdownButtonFormField<String>(
-              initialValue: _filterBagian.isEmpty ? null : _filterBagian,
-              isExpanded: true,
-              dropdownColor: c.surface,
-              style: TextStyle(color: c.textPrimary, fontSize: 13),
-              decoration: deco('Semua Bagian'),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Semua Bagian')),
-                ..._bagianList.map(
-                    (b) => DropdownMenuItem(value: b, child: Text(b))),
-              ],
-              onChanged: (v) => setState(() {
-                _filterBagian = v ?? '';
-                _applyFilters();
-              }),
+        _kategoriChips(context),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: Clickable(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _filterBagian.isEmpty ? null : _filterBagian,
+                  isExpanded: true,
+                  dropdownColor: c.surface,
+                  style: TextStyle(color: c.textPrimary, fontSize: 13),
+                  decoration: deco('Semua Bagian'),
+                  items: [
+                    const DropdownMenuItem(
+                        value: null, child: Text('Semua Bagian')),
+                    ..._bagianList.map(
+                        (b) => DropdownMenuItem(value: b, child: Text(b))),
+                  ],
+                  onChanged: (v) => setState(() {
+                    _filterBagian = v ?? '';
+                    _applyFilters();
+                  }),
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Clickable(
-            child: DropdownButtonFormField<String>(
-              initialValue: _filterPlan.isEmpty ? null : _filterPlan,
-              isExpanded: true,
-              dropdownColor: c.surface,
-              style: TextStyle(color: c.textPrimary, fontSize: 13),
-              decoration: deco('Semua PLAN'),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Semua PLAN')),
-                ..._planList
-                    .map((p) => DropdownMenuItem(value: p, child: Text(p))),
-              ],
-              onChanged: (v) => setState(() {
-                _filterPlan = v ?? '';
-                _applyFilters();
-              }),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Clickable(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _filterPlan.isEmpty ? null : _filterPlan,
+                  isExpanded: true,
+                  dropdownColor: c.surface,
+                  style: TextStyle(color: c.textPrimary, fontSize: 13),
+                  decoration: deco('Semua PLAN'),
+                  items: [
+                    const DropdownMenuItem(
+                        value: null, child: Text('Semua PLAN')),
+                    ..._planList
+                        .map((p) => DropdownMenuItem(value: p, child: Text(p))),
+                  ],
+                  onChanged: (v) => setState(() {
+                    _filterPlan = v ?? '';
+                    _applyFilters();
+                  }),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ],
+    );
+  }
+
+  /// Chip filter kategori: Semua / Computer / Laptop / Printer.
+  Widget _kategoriChips(BuildContext context) {
+    final c = context.appColors;
+    int countOf(String key) =>
+        key.isEmpty ? _all.length : _all.where((d) => _cat(d) == key).length;
+
+    Widget chip(String key, String label, IconData icon) {
+      final selected = _filterKategori == key;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: Clickable(
+          child: ChoiceChip(
+            selected: selected,
+            showCheckmark: false,
+            avatar: Icon(icon,
+                size: 16, color: selected ? c.onAccent : c.textMuted),
+            label: Text('$label (${countOf(key)})'),
+            labelStyle: TextStyle(
+                color: selected ? c.onAccent : c.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600),
+            backgroundColor: c.surface,
+            selectedColor: c.accent,
+            side: BorderSide(
+                color: selected ? c.accent : c.border,
+                width: selected ? 1.5 : 1),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999)),
+            onSelected: (_) => setState(() {
+              _filterKategori = key;
+              _applyFilters();
+            }),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 42,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          chip('', 'Semua', Icons.apps),
+          chip('Computer', 'Computer', Icons.computer),
+          chip('Laptop', 'Laptop', Icons.laptop),
+          chip('Printer', 'Printer', Icons.print),
+        ],
+      ),
     );
   }
 
