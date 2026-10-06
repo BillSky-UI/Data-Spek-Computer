@@ -53,12 +53,42 @@ class _DashboardPageState extends State<DashboardPage> {
     SpecCategory('Category Device', _cat, Icons.devices_other),
   ];
 
+  /// Kartu statistik saat filter kategori = Printer.
+  ///
+  /// Spesifikasi PC (processor/RAM/storage/OS) tidak relevan untuk printer,
+  /// jadi gridnya diganti dengan data yang memang diinput di form printer.
+  static const _printerCategories = [
+    SpecCategory('Tipe / Model Printer', _tipePrinter, Icons.print),
+    SpecCategory('Metode Koneksi', _koneksiPrinter, Icons.wifi),
+    SpecCategory('Category Device', _cat, Icons.devices_other),
+    SpecCategory('Status Perbaikan', _statusPrinter, Icons.build),
+  ];
+
+  /// Daftar kartu yang tampil sesuai filter kategori yang aktif.
+  List<SpecCategory> get _activeCategories =>
+      _filterKategori == 'Printer' ? _printerCategories : _categories;
+
   static String _proc(Device d) => processorGroup(d.prosesor);
   static String _mobo(Device d) => motherboardGroup(d.motherboard);
   static String _stor(Device d) => storageGroup(d.storage);
   static String _ram(Device d) => ramGroup(d.ram);
   static String _os(Device d) => osGroup(d.osWindows);
   static String _cat(Device d) => categoryKey(d.category);
+
+  static String _tipePrinter(Device d) {
+    final t = d.prosesor.trim();
+    return t.isEmpty ? belumDiInput : t;
+  }
+
+  static String _koneksiPrinter(Device d) {
+    final t = d.motherboard.trim();
+    return t.isEmpty ? belumDiInput : t;
+  }
+
+  static String _statusPrinter(Device d) {
+    final t = d.statusUpgrade.trim();
+    return t.isEmpty ? belumDiInput : t;
+  }
 
   @override
   void initState() {
@@ -518,10 +548,13 @@ class _DashboardPageState extends State<DashboardPage> {
   // ---------- Grid 2 kolom: statistik per varian ----------
   Widget _variantSection(BuildContext context) {
     final c = context.appColors;
+    final categories = _activeCategories;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('STATISTIK SPESIFIKASI',
+        Text(_filterKategori == 'Printer'
+            ? 'STATISTIK PRINTER'
+            : 'STATISTIK SPESIFIKASI',
             style: TextStyle(
                 color: c.textMuted,
                 fontSize: 12,
@@ -537,8 +570,8 @@ class _DashboardPageState extends State<DashboardPage> {
             crossAxisSpacing: 12,
             childAspectRatio: 0.86,
           ),
-          itemCount: _categories.length,
-          itemBuilder: (context, i) => _variantCard(context, _categories[i]),
+          itemCount: categories.length,
+          itemBuilder: (context, i) => _variantCard(context, categories[i]),
         ),
       ],
     );
