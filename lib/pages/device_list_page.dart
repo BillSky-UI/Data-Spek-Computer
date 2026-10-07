@@ -284,7 +284,7 @@ class _DeviceListPageState extends State<DeviceListPage> {
     );
   }
 
-  /// Impor file .xlsx -> tulis ke cloud Supabase (devices) + cache lokal
+  /// Impor file .xlsx -> tulis ke cloud (devices) + cache lokal
   /// sehingga WEB & APK memakai data impor ini sebagai default.
   Future<void> _importExcel(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);

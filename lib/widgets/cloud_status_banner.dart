@@ -5,7 +5,7 @@ import '../database/db_helper.dart';
 /// Banner kecil di atas konten saat data tidak tersedia sama sekali
 /// (cloud gagal DAN inisialisasi lokal gagal). Warna netral, bukan merah.
 ///
-/// Saat mode lokal aktif (Supabase belum dikonfigurasi/gagal) atau cloud
+/// Saat mode lokal aktif (cloud belum dikonfigurasi/gagal) atau cloud
 /// tersambung, banner tidak ditampilkan agar tidak mengganggu pengguna.
 class CloudStatusBanner extends StatelessWidget {
   const CloudStatusBanner({super.key});

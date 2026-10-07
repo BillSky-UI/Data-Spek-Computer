@@ -1,19 +1,73 @@
-/// Konfigurasi koneksi Cloud Database (Supabase).
+import 'package:flutter/foundation.dart';
+
+/// Konfigurasi koneksi Cloud Database (MySQL + REST API PHP).
 ///
 /// Isi nilai saat build:
 ///   flutter build apk --release \
-///     --dart-define=SUPABASE_URL=https://xxxx.supabase.co \
-///     --dart-define=SUPABASE_ANON_KEY=eyJhbGciOi...
+///     --dart-define=MYSQL_API_URL=https://domain.com/backend \
+///     --dart-define=MYSQL_API_KEY=rahasia-anda
+///
+/// Di web, URL bisa relatif (mis. "backend") terhadap origin halaman yang
+/// dibuka, dan dapat ditimpa runtime melalui file `web/config.json`:
+///   {
+///     "mysqlApiUrl": "https://domain.com/backend",
+///     "mysqlApiKey": "rahasia-anda"
+///   }
+/// `config.json` di-fetch di `main()` sebelum inisialisasi database.
 abstract final class AppConfig {
-  static const String supabaseUrl = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: 'https://YOUR-PROJECT.supabase.co',
+  static const String mysqlApiUrl = String.fromEnvironment(
+    'MYSQL_API_URL',
+    defaultValue: '',
   );
 
-  static const String supabaseAnonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue: 'YOUR_PUBLIC_ANON_KEY',
+  static const String mysqlApiKey = String.fromEnvironment(
+    'MYSQL_API_KEY',
+    defaultValue: '',
   );
+
+  /// Override runtime (dari web/config.json).
+  static String? _runtimeUrl;
+  static String? _runtimeKey;
+
+  static void applyRuntimeConfig({
+    String? mysqlApiUrl,
+    String? mysqlApiKey,
+  }) {
+    if (mysqlApiUrl != null && mysqlApiUrl.trim().isNotEmpty) {
+      _runtimeUrl = mysqlApiUrl.trim();
+    }
+    if (mysqlApiKey != null && mysqlApiKey.trim().isNotEmpty) {
+      _runtimeKey = mysqlApiKey.trim();
+    }
+  }
+
+  static String? get runtimeUrl => _runtimeUrl;
+  static String? get runtimeKey => _runtimeKey;
+
+  /// Base URL folder backend (berisi api.php) yang dipakai aplikasi.
+  static String get apiBase {
+    final overridden = _runtimeUrl;
+    if (overridden != null && overridden.isNotEmpty) return overridden;
+
+    final fromEnv = mysqlApiUrl.trim();
+    if (fromEnv.isNotEmpty) return fromEnv;
+
+    // Di web, bila tidak dikonfigurasi, coba relatif ke origin halaman
+    // ("backend/api.php" se-folder dengan halaman yang dibuka).
+    if (kIsWeb) {
+      final origin = Uri.base;
+      if (origin.scheme == 'http' || origin.scheme == 'https') {
+        return 'backend';
+      }
+    }
+    return '';
+  }
+
+  static String get apiKey {
+    final overridden = _runtimeKey;
+    if (overridden != null && overridden.isNotEmpty) return overridden;
+    return mysqlApiKey;
+  }
 
   /// Base URL halaman web publik untuk mode "scan tanpa aplikasi".
   ///
@@ -39,7 +93,6 @@ abstract final class AppConfig {
     return '$base?kode=${Uri.encodeComponent(kode)}';
   }
 
-  static bool get isConfigured =>
-      !supabaseUrl.contains('YOUR-PROJECT') &&
-      !supabaseAnonKey.contains('YOUR_PUBLIC');
+  /// `true` bila konfigurasi cloud tersedia (baik dart-define maupun runtime).
+  static bool get isConfigured => apiBase.isNotEmpty;
 }

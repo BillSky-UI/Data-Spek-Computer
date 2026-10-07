@@ -1,0 +1,6 @@
+{
+  "//": "Konfigurasi runtime build web (opsional). Di-fetch di main() sebelum koneksi cloud.",
+  "//2": "Kosongkan bila pakai --dart-define saat build. 'mysqlApiUrl' boleh path relatif, mis. 'backend'.",
+  "mysqlApiUrl": "",
+  "mysqlApiKey": ""
+}

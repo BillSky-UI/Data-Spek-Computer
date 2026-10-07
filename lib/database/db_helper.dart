@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:excel/excel.dart' as excel_pkg;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../env/app_config.dart';
 import '../models/device.dart';
 import '../services/pin_controller.dart';
 import 'local_database.dart';
+import 'mysql_client.dart';
 
 /// Hasil operasi hapus master (Bagian/PLAN).
 ///
@@ -47,8 +47,8 @@ class MasterUbahResult {
 bool _samaNama(String a, String b) =>
     a.trim().toLowerCase() == b.trim().toLowerCase();
 
-/// Repository data: Cloud (Supabase) + real-time, atau Local (SQLite) jika
-/// Supabase belum dikonfigurasi / gagal terhubung.
+/// Repository data: Cloud (MySQL via backend/api.php) + polling ringan, atau
+/// Local (SQLite) jika cloud tidak dikonfigurasi / gagal terhubung.
 ///
 /// Saat mode lokal aktif, aplikasi otomatis men-seed data dari Excel
 /// ("assets/seed_inventaris.xlsx", sheet 'Spesifikasi Komputer')
@@ -67,7 +67,7 @@ class DbHelper extends ChangeNotifier {
   DbHelper._();
   static final DbHelper instance = DbHelper._();
 
-  // ----- Tabel (cloud, lihat supabase/schema.sql) -----
+  // ----- Tabel (cloud, lihat backend/schema.sql) -----
   static const String _tDevices = 'devices';
   static const String _tBagian = 'bagian';
   static const String _tPlan = 'plan';
@@ -76,9 +76,15 @@ class DbHelper extends ChangeNotifier {
   static const String _assetExcel = 'assets/seed_inventaris.xlsx';
   static const String _sheetName = 'Spesifikasi Komputer';
 
-  SupabaseClient? _client;
+  CloudApi? _api;
 
-  // ----- State cache (real-time) -----
+  // ----- Sinkronisasi polling (5 detik) -----
+  static const Duration _pollInterval = Duration(seconds: 5);
+  Timer? _pollTimer;
+  int _lastRev = -1;
+  bool _polling = false;
+
+  // ----- State cache (polling) -----
   List<Device> _devices = [];
   List<Map<String, dynamic>> _bagianRows = [];
   List<String> _bagianMaster = [];
@@ -88,23 +94,19 @@ class DbHelper extends ChangeNotifier {
   bool synced = false;
   String? lastError;
 
-  /// `true` saat berjalan di SQLite lokal (Supabase tidak dikonfigurasi/gagal).
+  /// `true` saat berjalan di SQLite lokal (cloud tidak dikonfigurasi/gagal).
   bool localMode = false;
 
-  StreamSubscription<List<Map<String, dynamic>>>? _subDev;
-  StreamSubscription<List<Map<String, dynamic>>>? _subBag;
-  StreamSubscription<List<Map<String, dynamic>>>? _subSet;
-
-  bool get cloudReady => _client != null;
+  bool get cloudReady => _api != null;
   List<Device> get devices => List.unmodifiable(_devices);
 
   // ============================================================
-  //  INISIALISASI & REALTIME
+  //  INISIALISASI & POLLING
   // ============================================================
 
-  /// Hubungkan ke Supabase, muat data awal, pasang subscription real-time.
-  /// Jika cloud tidak dikonfigurasi atau gagal terhubung → beralih ke SQLite
-  /// lokal dan men-seed data dari Excel (tanpa banner error merah).
+  /// Hubungkan ke cloud (backend/api.php), buat skema bila perlu, lalu mulai
+  /// polling ringan tiap 5 detik. Jika cloud tidak dikonfigurasi atau gagal
+  /// terhubung → beralih ke SQLite lokal dan men-seed data dari Excel.
   Future<void> initCloud() async {
     lastError = null;
 
@@ -113,64 +115,73 @@ class DbHelper extends ChangeNotifier {
       return;
     }
 
+    final api = CloudApi();
+    _api = api;
     try {
-      _client = Supabase.instance.client;
-      await _fetchAll();
-      await _ensureMastersFromDevices();
-
-      _subDev = _client!.from(_tDevices).stream(primaryKey: ['id']).listen(
-        (rows) {
-          _devices = rows.map(Device.fromMap).toList()..sort(_byKode);
-          _derivePlanMaster();
-          notifyListeners();
-        },
-        onError: (Object e) {
-          lastError = '$e';
-          notifyListeners();
-        },
-      );
-
-      _subBag = _client!.from(_tBagian).stream(primaryKey: ['id']).listen(
-        (rows) {
-          _bagianRows = rows;
-          _bagianMaster = rows
-              .map((r) => (r['name'] ?? '').toString())
-              .where((n) => n.trim().isNotEmpty)
-              .toList()
-            ..sort();
-          notifyListeners();
-        },
-        onError: (Object e) {
-          lastError = '$e';
-          notifyListeners();
-        },
-      );
-
-      // PIN tersinkronisasi: ubah di satu perangkat → semua perangkat ikut.
-      _subSet = _client!
-          .from(_tSettings)
-          .stream(primaryKey: ['id'])
-          .eq('id', 1)
-          .listen(
-        (rows) {
-          if (rows.isNotEmpty) {
-            _cachedPinHash = (rows.first['pin_hash'] ?? '').toString();
-          }
-          notifyListeners();
-        },
-        onError: (Object e) {
-          lastError = '$e';
-          notifyListeners();
-        },
-      );
-
+      await api.ping();
+      // Buat tabel bila hosting baru (belum sempat import schema.sql).
+      // Idempoten; bila user MySQL tidak punya hak CREATE, galat diabaikan.
+      try {
+        await api.migrate();
+      } catch (e) {
+        debugPrintFallback('[DbHelper] Auto-migrate dilewati: $e');
+      }
+      await _poll();
       synced = true;
       lastError = null;
+      _startPolling();
     } catch (e) {
-      _client = null;
+      await _stopPollingForError();
       await _initLocalMode('Gagal tersambung cloud ($e) — memakai database lokal.');
       return;
     }
+    notifyListeners();
+  }
+
+  // Hentikan polling & bersihkan klien karena cloud gagal terhubung.
+  Future<void> _stopPollingForError() async {
+    _stopPolling();
+    _api = null;
+    _lastRev = -1;
+  }
+
+  void _startPolling() {
+    _stopPolling();
+    _pollTimer = Timer.periodic(_pollInterval, (_) => _poll());
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  /// Satu siklus polling: cek `rev`, bila berubah muat ulang seluruh cache.
+  ///
+  /// Gagal sekali tidak menghentikan polling (mis. jaringan putus sesaat);
+  /// hanya dicatat ke [lastError] untuk banner status.
+  Future<void> _poll() async {
+    if (_api == null || _polling) return;
+    _polling = true;
+    try {
+      final data = await _api!.rev();
+      final rev = (data['rev'] as num?)?.toInt() ?? -1;
+      if (rev != _lastRev) {
+        _lastRev = rev;
+        await _fetchAll();
+        notifyListeners();
+      }
+    } on ApiException catch (e) {
+      _setLastError('Cloud: ${e.message}');
+    } catch (e) {
+      _setLastError('Cloud tidak tersambung: $e');
+    } finally {
+      _polling = false;
+    }
+  }
+
+  void _setLastError(String? message) {
+    if (message == null || message == lastError) return;
+    lastError = message;
     notifyListeners();
   }
 
@@ -203,11 +214,11 @@ class DbHelper extends ChangeNotifier {
   }
 
   Future<void> _fetchAll() async {
-    if (_client == null) return;
-    final devRows = await _client!.from(_tDevices).select().order('id');
+    if (_api == null) return;
+    final devRows = await _api!.select(_tDevices, orderBy: 'id');
     _devices = devRows.map(Device.fromMap).toList()..sort(_byKode);
 
-    final bagRows = await _client!.from(_tBagian).select().order('name');
+    final bagRows = await _api!.select(_tBagian, orderBy: 'name');
     _bagianRows = bagRows;
     _bagianMaster = bagRows
         .map((r) => (r['name'] ?? '').toString())
@@ -218,8 +229,9 @@ class DbHelper extends ChangeNotifier {
     // Plan master diambil dari tabel plan, bukan hanya dari perangkat,
     // supaya plan yang belum dipakai perangkat tetap ikut terhitung.
     try {
-      final planRows = await _client!.from(_tPlan).select(
-        'name',
+      final planRows = await _api!.select(
+        _tPlan,
+        columns: ['name'],
       );
       _planMaster = planRows
           .map((r) => (r['name'] ?? '').toString())
@@ -232,13 +244,14 @@ class DbHelper extends ChangeNotifier {
     }
     _derivePlanMaster();
 
-    final setRows = await _client!
-        .from(_tSettings)
-        .select('pin_hash')
-        .eq('id', 1)
-        .maybeSingle();
-    if (setRows != null) {
-      _cachedPinHash = (setRows['pin_hash'] ?? '').toString();
+    final setRows = await _api!.select(
+      _tSettings,
+      columns: ['pin_hash'],
+      where: [CloudApi.eq('id', 1)],
+      limit: 1,
+    );
+    if (setRows.isNotEmpty) {
+      _cachedPinHash = (setRows.first['pin_hash'] ?? '').toString();
     }
   }
 
@@ -254,14 +267,13 @@ class DbHelper extends ChangeNotifier {
 
   @override
   void dispose() {
-    for (final s in [_subDev, _subBag, _subSet]) {
-      s?.cancel();
-    }
+    _stopPolling();
+    _api = null;
     super.dispose();
   }
 
   // ============================================================
-  //  CRUD PERANGKAT (Cloud, sinkron real-time)
+  //  CRUD PERANGKAT (Cloud, sinkron polling)
   // ============================================================
 
   Future<List<Device>> getAll() async {
@@ -269,7 +281,7 @@ class DbHelper extends ChangeNotifier {
       if (_devices.isEmpty) await _reloadLocalCache();
       return devices;
     }
-    if (_devices.isEmpty && _client != null) {
+    if (_devices.isEmpty && _api != null) {
       await _fetchAll();
     }
     return devices;
@@ -277,9 +289,9 @@ class DbHelper extends ChangeNotifier {
 
   Future<int> insert(Device d) async {
     if (localMode) return _insertLocal(d);
-    if (_client == null) return 0;
+    if (_api == null) return 0;
     final payload = {...d.toMap()}..remove('id');
-    final rows = await _client!.from(_tDevices).insert(payload).select();
+    final rows = await _api!.insert(_tDevices, [payload], returning: true);
     if (rows.isNotEmpty) {
       _upsertLocal(Device.fromMap(rows.first));
       _derivePlanMaster();
@@ -304,9 +316,9 @@ class DbHelper extends ChangeNotifier {
       notifyListeners();
       return r > 0 ? 1 : 0;
     }
-    if (_client == null || d.id == null) return 0;
+    if (_api == null || d.id == null) return 0;
     final payload = {...d.toMap()}..remove('id');
-    await _client!.from(_tDevices).update(payload).eq('id', d.id!);
+    await _api!.update(_tDevices, payload, [CloudApi.eq('id', d.id!)]);
     _upsertLocal(d);
     _derivePlanMaster();
     notifyListeners();
@@ -320,8 +332,8 @@ class DbHelper extends ChangeNotifier {
       notifyListeners();
       return n > 0 ? 1 : 0;
     }
-    if (_client == null) return 0;
-    await _client!.from(_tDevices).delete().eq('id', id);
+    if (_api == null) return 0;
+    await _api!.delete(_tDevices, [CloudApi.eq('id', id)]);
     _devices.removeWhere((d) => d.id == id);
     _derivePlanMaster();
     notifyListeners();
@@ -345,7 +357,7 @@ class DbHelper extends ChangeNotifier {
 
   Future<String> nextKode(String category) async {
     if (localMode) return LocalDatabase.instance.nextKode(category);
-    if (_devices.isEmpty && _client != null) {
+    if (_devices.isEmpty && _api != null) {
       await _fetchAll();
     }
     final prefix = _prefixFor(category);
@@ -415,7 +427,7 @@ class DbHelper extends ChangeNotifier {
       if (_bagianMaster.isEmpty) await _reloadLocalCache();
       return List.of(_bagianMaster);
     }
-    if (_bagianMaster.isEmpty && _client != null) await _fetchAll();
+    if (_bagianMaster.isEmpty && _api != null) await _fetchAll();
     return List.of(_bagianMaster);
   }
 
@@ -428,13 +440,11 @@ class DbHelper extends ChangeNotifier {
       }
       return ok;
     }
-    if (_client == null) return false;
+    if (_api == null) return false;
     final trimmed = name.trim();
     if (trimmed.isEmpty) return false;
     try {
-      await _client!
-          .from(_tBagian)
-          .upsert({'name': trimmed}, onConflict: 'name');
+      await _api!.upsert(_tBagian, [{'name': trimmed}], onConflict: 'name');
       if (!_bagianMaster.contains(trimmed)) {
         _bagianMaster = [..._bagianMaster, trimmed]..sort();
       }
@@ -464,7 +474,7 @@ class DbHelper extends ChangeNotifier {
       notifyListeners();
       return MasterUbahResult(berhasil: true, perangkatDiperbarui: n);
     }
-    if (_client == null) return const MasterUbahResult(berhasil: false);
+    if (_api == null) return const MasterUbahResult(berhasil: false);
     final row = _bagianRows.firstWhere(
       (r) => (r['name'] ?? '').toString() == oldName,
       orElse: () => const {},
@@ -472,7 +482,7 @@ class DbHelper extends ChangeNotifier {
     final id = row['id'];
     if (id == null) return const MasterUbahResult(berhasil: false);
     try {
-      await _client!.from(_tBagian).update({'name': baru}).eq('id', id);
+      await _api!.update(_tBagian, {'name': baru}, [CloudApi.eq('id', id)]);
     } catch (_) {
       return const MasterUbahResult(berhasil: false, sudahAda: true);
     }
@@ -503,7 +513,7 @@ class DbHelper extends ChangeNotifier {
       }
       return MasterHapusResult(berhasil: ok);
     }
-    if (_client == null) return const MasterHapusResult(berhasil: false);
+    if (_api == null) return const MasterHapusResult(berhasil: false);
     final row = _bagianRows.firstWhere(
       (r) => (r['name'] ?? '').toString() == name,
       orElse: () => const {},
@@ -511,7 +521,7 @@ class DbHelper extends ChangeNotifier {
     final id = row['id'];
     if (id == null) return const MasterHapusResult(berhasil: false);
     try {
-      await _client!.from(_tBagian).delete().eq('id', id);
+      await _api!.delete(_tBagian, [CloudApi.eq('id', id)]);
     } catch (_) {
       return const MasterHapusResult(berhasil: false, sudahAda: true);
     }
@@ -530,11 +540,11 @@ class DbHelper extends ChangeNotifier {
       }
       return ok;
     }
-    if (_client == null) return false;
+    if (_api == null) return false;
     final trimmed = name.trim();
     if (trimmed.isEmpty) return false;
     try {
-      await _client!.from(_tPlan).upsert({'name': trimmed}, onConflict: 'name');
+      await _api!.upsert(_tPlan, [{'name': trimmed}], onConflict: 'name');
       if (!_planMaster.contains(trimmed)) {
         _planMaster = [..._planMaster, trimmed]..sort();
       }
@@ -550,7 +560,7 @@ class DbHelper extends ChangeNotifier {
       if (_planMaster.isEmpty) await _reloadLocalCache();
       return List.of(_planMaster);
     }
-    if (_planMaster.isEmpty && _client != null) await _fetchAll();
+    if (_planMaster.isEmpty && _api != null) await _fetchAll();
     return List.of(_planMaster);
   }
 
@@ -572,9 +582,10 @@ class DbHelper extends ChangeNotifier {
       notifyListeners();
       return MasterUbahResult(berhasil: true, perangkatDiperbarui: n);
     }
-    if (_client == null) return const MasterUbahResult(berhasil: false);
+    if (_api == null) return const MasterUbahResult(berhasil: false);
     try {
-      await _client!.from(_tPlan).update({'name': baru}).eq('name', oldName);
+      await _api!
+          .update(_tPlan, {'name': baru}, [CloudApi.eq('name', oldName)]);
     } catch (_) {
       return const MasterUbahResult(berhasil: false, sudahAda: true);
     }
@@ -600,9 +611,9 @@ class DbHelper extends ChangeNotifier {
       }
       return MasterHapusResult(berhasil: ok);
     }
-    if (_client == null) return const MasterHapusResult(berhasil: false);
+    if (_api == null) return const MasterHapusResult(berhasil: false);
     try {
-      await _client!.from(_tPlan).delete().eq('name', name);
+      await _api!.delete(_tPlan, [CloudApi.eq('name', name)]);
     } catch (_) {
       return const MasterHapusResult(berhasil: false, sudahAda: true);
     }
@@ -615,8 +626,8 @@ class DbHelper extends ChangeNotifier {
   /// perbarui cache lokal. Mengembalikan jumlah perangkat yang terpengaruh.
   ///
   /// cloud: satu request `UPDATE ... WHERE id IN (...)` dengan id yang sudah
-  /// dicocokkan di memori, sehingga pencocokan tidak bergantung kepekaan huruf
-  /// besar-kecil milik PostgREST.
+  /// dicocokkan di memori, sehingga pencocokan tidak bergantung kepekaan
+  /// huruf besar-kecil / kolasi di sisi server.
   Future<int> _renameDevices(
     String column,
     String oldName,
@@ -633,9 +644,10 @@ class DbHelper extends ChangeNotifier {
       return n;
     }
     final ids = target.map((d) => d.id).whereType<int>().toList();
-    if (ids.isNotEmpty && _client != null) {
+    if (ids.isNotEmpty && _api != null) {
       try {
-        await _client!.from(_tDevices).update({column: newName}).inFilter('id', ids);
+        await _api!
+            .update(_tDevices, {column: newName}, [CloudApi.inList('id', ids)]);
       } catch (_) {
         return 0;
       }
@@ -713,7 +725,7 @@ class DbHelper extends ChangeNotifier {
       await _reloadLocalCache();
       return;
     }
-    if (_client == null) return;
+    if (_api == null) return;
     final bagins = _devices
         .map((d) => d.bagian)
         .where((b) => b.trim().isNotEmpty)
@@ -721,9 +733,7 @@ class DbHelper extends ChangeNotifier {
         .map((b) => {'name': b})
         .toList();
     if (bagins.isNotEmpty) {
-      await _client!
-          .from(_tBagian)
-          .upsert(bagins, onConflict: 'name');
+      await _api!.upsert(_tBagian, bagins, onConflict: 'name');
     }
     final plans = _devices
         .map((d) => d.plan)
@@ -732,7 +742,7 @@ class DbHelper extends ChangeNotifier {
         .map((p) => {'name': p})
         .toList();
     if (plans.isNotEmpty) {
-      await _client!.from(_tPlan).upsert(plans, onConflict: 'name');
+      await _api!.upsert(_tPlan, plans, onConflict: 'name');
     }
     await _fetchAll();
   }
@@ -742,15 +752,16 @@ class DbHelper extends ChangeNotifier {
   // ============================================================
 
   Future<String?> _cloudPinHash() async {
-    if (_client == null) return null;
+    if (_api == null) return null;
     try {
-      final rows = await _client!
-          .from(_tSettings)
-          .select('pin_hash')
-          .eq('id', 1)
-          .maybeSingle();
-      if (rows != null) {
-        _cachedPinHash = (rows['pin_hash'] ?? '').toString();
+      final rows = await _api!.select(
+        _tSettings,
+        columns: ['pin_hash'],
+        where: [CloudApi.eq('id', 1)],
+        limit: 1,
+      );
+      if (rows.isNotEmpty) {
+        _cachedPinHash = (rows.first['pin_hash'] ?? '').toString();
       }
       return _cachedPinHash;
     } catch (_) {
@@ -760,9 +771,9 @@ class DbHelper extends ChangeNotifier {
 
   Future<bool> verifyPin(String pin) async {
     final hash = PinController.hashPin(pin);
-    // Selalu ambil PIN terkini dari cloud (realtime-sync) saat online,
+    // Selalu ambil PIN terkini dari cloud (sinkron polling) saat online,
     // sehingga PIN yang diubah di HP lain langsung berlaku di sini.
-    if (_client != null) {
+    if (_api != null) {
       await _cloudPinHash();
     }
     final stored = _cachedPinHash;
@@ -781,11 +792,13 @@ class DbHelper extends ChangeNotifier {
       return false;
     }
     final hash = PinController.hashPin(np);
-    if (_client != null) {
+    if (_api != null) {
       try {
-        await _client!
-            .from(_tSettings)
-            .upsert({'id': 1, 'pin_hash': hash}, onConflict: 'id');
+        await _api!.upsert(
+          _tSettings,
+          [{'id': 1, 'pin_hash': hash}],
+          onConflict: 'id',
+        );
         _cachedPinHash = hash;
         // Sinkronkan juga ke cache lokal agar PIN tetap berfungsi saat
         // offline / PIN cloud belum diisi.
@@ -814,9 +827,9 @@ class DbHelper extends ChangeNotifier {
       }
       return;
     }
-    if (_client == null) return;
+    if (_api == null) return;
     try {
-      final existing = await _client!.from(_tDevices).select('id');
+      final existing = await _api!.select(_tDevices, columns: ['id']);
       if (existing.isEmpty) {
         // Cloud masih kosong → pertahankan data yang sudah ada dengan
         // mengunggah isi database lokal terlebih dahulu (jika ada),
@@ -831,9 +844,10 @@ class DbHelper extends ChangeNotifier {
           source = await loadExcelSeed();
         }
         if (source.isNotEmpty) {
-          await _client!
-              .from(_tDevices)
-              .insert(source.map((d) => ({...d.toMap()}..remove('id'))).toList());
+          await _api!.insert(
+            _tDevices,
+            source.map((d) => ({...d.toMap()}..remove('id'))).toList(),
+          );
         }
       }
       await _ensureMastersFromDevices();
@@ -855,13 +869,14 @@ class DbHelper extends ChangeNotifier {
       notifyListeners();
       return data.length;
     }
-    if (_client == null) return 0;
-    await _client!.from(_tDevices).delete().neq('id', 0);
+    if (_api == null) return 0;
+    await _api!.delete(_tDevices, [CloudApi.ne('id', 0)]);
     final data = await loadExcelSeed();
     if (data.isNotEmpty) {
-      await _client!.from(_tDevices).insert(
-            data.map((d) => ({...d.toMap()}..remove('id'))).toList(),
-          );
+      await _api!.insert(
+        _tDevices,
+        data.map((d) => ({...d.toMap()}..remove('id'))).toList(),
+      );
       await _ensureMastersFromDevices();
     }
     return data.length;
@@ -874,7 +889,7 @@ class DbHelper extends ChangeNotifier {
   // ============================================================
   //  IMPORT FILE EXCEL (dipilih user) — web & apk, data SATU cloud
   //  1) baca byte .xlsx -> List<Device>
-  //  2) tulis ke cloud (Supabase devices) bila terhubung
+  //  2) tulis ke cloud (devices) bila terhubung
   //  3) upsert cache lokal -> sinkron di APK & web
   // ============================================================
 
@@ -1040,7 +1055,7 @@ class DbHelper extends ChangeNotifier {
     return '';
   }
 
-  /// Impor file .xlsx pilihan user ke cloud (Supabase) + cache lokal.
+  /// Impor file .xlsx pilihan user ke cloud (MySQL) + cache lokal.
   Future<int> importExcelFile(Uint8List bytes) async {
     List<Device> data;
     try {
@@ -1065,16 +1080,17 @@ class DbHelper extends ChangeNotifier {
         }
       }
       await _reloadLocalCache();
-    } else if (_client != null) {
+    } else if (_api != null) {
       var savedToCloud = false;
       try {
-        await _client!.from(_tDevices).upsert(
-              data
-                  .where((d) => _kodeKey(d.kodeInventaris).isNotEmpty)
-                  .map((d) => ({...d.toMap()}..remove('id')))
-                  .toList(),
-              onConflict: 'kode_inventaris',
-            );
+        await _api!.upsert(
+          _tDevices,
+          data
+              .where((d) => _kodeKey(d.kodeInventaris).isNotEmpty)
+              .map((d) => ({...d.toMap()}..remove('id')))
+              .toList(),
+          onConflict: 'kode_inventaris',
+        );
         savedToCloud = true;
       } catch (e) {
         debugPrintFallback('Cloud impor gagal, simpan lokal saja: $e');

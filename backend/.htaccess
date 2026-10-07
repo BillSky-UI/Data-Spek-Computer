@@ -1,0 +1,10 @@
+# Perlindungan Apache (shared hosting cPanel).
+# Kredensial & skema tidak boleh bisa diunduh langsung dari browser.
+<FilesMatch "^(config\.php|config\.example\.php|schema\..*\.sql|\.gitignore)$">
+    Require all denied
+</FilesMatch>
+
+# Kompresi ringan bila mod_deflate aktif.
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css application/javascript application/json
+</IfModule>
