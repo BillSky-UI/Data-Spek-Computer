@@ -40,9 +40,6 @@ dependencies:
   path: ^1.9.0
   path_provider: ^2.1.4
 
-  # Sinkronisasi cloud via REST API MySQL (backend/api.php)
-  http: ^1.6.0
-
   # Membaca file Excel
   excel: ^4.0.6
 
@@ -55,6 +52,7 @@ dependencies:
   permission_handler: ^13.0.2
   crypto: ^3.0.7
   mobile_scanner: ^7.4.0
+  supabase_flutter: ^2.17.2
   barcode_widget: ^2.0.4
   pdf: ^3.12.0
   gal: ^2.3.3

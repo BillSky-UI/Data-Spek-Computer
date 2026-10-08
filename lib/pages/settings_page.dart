@@ -117,7 +117,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         'Basis Data',
                         DbHelper.instance.localMode
                             ? 'Lokal (SQLite) — offline'
-                            : 'MySQL Cloud (sinkron 5 detik)'),
+                            : 'Supabase Cloud (real-time sync)'),
                     _infoTile(
                         context,
                         Icons.auto_awesome,

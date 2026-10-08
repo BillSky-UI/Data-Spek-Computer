@@ -1,9 +1,6 @@
-import 'dart:convert';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'database/db_helper.dart';
 import 'env/app_config.dart';
@@ -12,28 +9,17 @@ import 'pages/pin_login_page.dart';
 import 'services/settings_controller.dart';
 import 'theme/app_theme.dart';
 
-/// Di web: baca `web/config.json` (URL API + kunci) saat runtime sehingga build
-/// web yang sama bisa dipakai untuk beberapa hosting tanpa build ulang.
-Future<void> _maybeLoadRuntimeConfig() async {
-  if (!kIsWeb) return;
-  try {
-    final url = Uri.base.resolve('config.json');
-    final res = await http.get(url).timeout(const Duration(seconds: 5));
-    if (res.statusCode != 200) return;
-    final data = jsonDecode(res.body) as Map<String, dynamic>;
-    AppConfig.applyRuntimeConfig(
-      mysqlApiUrl: data['mysqlApiUrl'] as String?,
-      mysqlApiKey: data['mysqlApiKey'] as String?,
-    );
-  } catch (e) {
-    // config.json tidak ada / rusak → pakai nilai dart-define bawaan.
-    debugPrintFallback('config.json tidak terbaca, pakai dart-define: $e');
-  }
-}
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await _maybeLoadRuntimeConfig();
+  try {
+    await Supabase.initialize(
+      url: AppConfig.supabaseUrl,
+      publishableKey: AppConfig.supabaseAnonKey,
+    );
+  } catch (e) {
+    // Supabase belum dikonfigurasi → aplikasi tetap jalan (PIN fallback lokal).
+    debugPrintFallback('Supabase init skipped: $e');
+  }
 
   final settings = SettingsController();
   await Future.wait([

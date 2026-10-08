@@ -7,7 +7,7 @@ import '../models/device.dart';
 import 'web_db_factory.dart';
 
 /// Penyimpanan lokal (SQLite) sebagai fallback saat cloud tidak tersedia.
-/// Struktur tabel identik dengan skema cloud (backend/schema.sql) sehingga migrasi
+/// Struktur tabel identik dengan skema cloud (Supabase) sehingga migrasi
 /// antar mode aman. Seed dari Excel dilakukan jika tabel masih kosong.
 class LocalDatabase {
   LocalDatabase._();

@@ -16,7 +16,7 @@ Printer) untuk kebutuhan internal perusahaan. Fungsinya:
 - Mengelola **PLAN** dan **Bagian** sebagai master data.
 - Menampilkan statistik dan dashboard kondisi perangkat.
 - Menghasilkan **barcode/QR, stiker, dan PDF spesifikasi** untuk ditempel di perangkat.
-- Mendukung **offline** (SQLite) maupun **sinkronisasi cloud** (MySQL + REST API PHP).
+- Mendukung **offline** (SQLite) maupun **sinkronisasi cloud** (Supabase).
 - Mengimpor dan mengekspor data ke/from Excel.
 
 Aplikasi berjalan di **Android, iOS, dan Web (PWA)** dari satu basis kode.
@@ -35,7 +35,7 @@ yang membuat satu kode Dart dapat dijalankan di Android, iOS, maupun Web.
 | ------------------ | ------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Bahasa aplikasi    | **Dart**                  | Seluruh file `lib/*.dart`                                                                             |
 | Framework UI       | **Flutter**               | Widget, navigasi, tema, layout                                                                        |
-| Basis data cloud   | **MySQL** (via `backend/api.php`, REST + polling) |                                                                                                       |
+| Basis data cloud   | **Supabase** (PostgreSQL) |                                                                                                       |
 | Basis data offline | **SQLite**                | `sqflite` (Android/iOS), `sqlite3.wasm` (Web)                                                         |
 | Bahasa query       | **SQL**                   | `CREATE TABLE`, `ALTER TABLE`, `SELECT`, `INSERT`                                                     |
 | Android            | **Kotlin** + Gradle       | `MainActivity.kt` sebagai *host*, logika bisnis tetap Dart                                            |
@@ -53,7 +53,7 @@ yang membuat satu kode Dart dapat dijalankan di Android, iOS, maupun Web.
 
 | Package                              | Fungsi                                                             |
 | ------------------------------------ | ------------------------------------------------------------------ |
-| `http` ^1.6.0                       | Klien REST ke `backend/api.php` (MySQL)            |
+| `supabase_flutter`                   | Koneksi &amp; sinkronisasi database cloud (realtime)               |
 | `sqflite` + `sqflite_common_ffi_web` | Database lokal SQLite (Android/iOS &amp; Web)                      |
 | `excel` ^4.0.6                       | Membaca &amp; menulis file `.xlsx`                                 |
 | `file_picker`                        | Memilih file Excel dari penyimpanan HP                             |
@@ -84,9 +84,9 @@ yang membuat satu kode Dart dapat dijalankan di Android, iOS, maupun Web.
 
 ```
 lib/
-├── main.dart                     # Entry point: baca config.json, init cloud, buka gerbang PIN
+├── main.dart                     # Entry point: init Supabase, buka gerbang PIN
 ├── app_info.dart                 # Nama & versi aplikasi
-├── env/app_config.dart           # Konfigurasi MySQL & URL publik QR
+├── env/app_config.dart           # Konfigurasi Supabase & URL publik QR
 ├── models/device.dart            # Model data Device (17 field)
 ├── database/
 │   ├── db_helper.dart            # Otak data: CRUD, cache, import Excel, master data, PIN cloud
@@ -192,11 +192,9 @@ Nomor Always 3 digit dan berasal dari nomor terbesar yang sudah ada.
 
 Aplikasi punya **dua mode** yang dipilih otomatis:
 
-1. **Mode Cloud (MySQL + REST API PHP)**
-   - Aktif bila `MYSQL_API_URL` (dan opsional `MYSQL_API_KEY`) diisi saat build,
-     atau di web melalui `web/config.json` / URL relatif `backend`.
-   - Data tersimpan di server, tersinkron antar perangkat dengan **polling ringan
-     tiap 5 detik** (`op=rev` lalu unduh ulang bila ada perubahan).
+1. **Mode Cloud (Supabase)**
+   - Aktif bila `SUPABASE_URL` dan `SUPABASE_ANON_KEY` diisi saat build.
+   - Data tersimpan di server, tersinkron antar perangkat, danupdate otomatis (realtime).
 2. **Mode Lokal (SQLite)**
    - Otomatis dipakai bila cloud tidak dikonfigurasi atau gagal connect.
    - File basis data: `inventaris_local.db` di folder dokumen aplikasi.
@@ -210,7 +208,7 @@ Aplikasi punya **dua mode** yang dipilih otomatis:
      sehingga file tidak ditemukan → error "Unable to load assets/…".
 
 Anda dapat melihat mode yang aktif di **Pengaturan → Informasi Aplikasi → Basis Data**  
-(`Lokal (SQLite) — offline` atau `MySQL Cloud (sinkron 5 detik)`).
+(`Lokal (SQLite) — offline` atau `Supabase Cloud (real-time sync)`).
 
 ---
 
@@ -507,7 +505,7 @@ baris perusahaan `PT. DWI PRIMA REZEKY - IT`, dan baris periode.
    - Mendeteksi baris header utama maupun sub-header setelah baris kop/spacer.
    - Mengenali header Bahasa Inggris (mis. `Processor`).
    - Melewatkan baris tanpa Kode Inventaris.
-4. Data **disimpan ke SQLite lokal** dan, bila cloud aktif, **di-upsert ke MySQL** lalu  
+4. Data **disimpan ke SQLite lokal** dan, bila cloud aktif, **di-upsert ke Supabase** lalu  
  cache di-refresh agar ID cloud tersedia.
 5. Muncul notifikasi **"Impor Excel berhasil: N perangkat tersimpan."**; bila tidak ada baris  
  yang dikenali, muncul **"File Excel kosong / kolom tidak dikenali."**; bila error,  
@@ -559,21 +557,13 @@ flutter build apk --release
 
 Output: `build/app/outputs/flutter-apk/app-release.apk`
 
-### 9.3 Build dengan Cloud (MySQL) Aktif
+### 9.3 Build dengan Cloud (Supabase) Aktif
 
 ```bash
 flutter build apk --release \
-  --dart-define=MYSQL_API_URL=https://domain.com/backend \
-  --dart-define=MYSQL_API_KEY=rahasia-api-anda
+  --dart-define=SUPABASE_URL=https://xxxx.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=eyJhbGciOi...
 ```
-
-`MYSQL_API_URL` = folder deploy yang berisi `api.php` (mis. `https://domain.com/backend`),
-`MYSQL_API_KEY` = kunci API dari `backend/config.php` (opsional, dianjurkan di hosting publik).
-
-Deploy web: selain folder `web-deploy/`, upload juga folder `backend/` ke hosting bersama,
-lalu (1) impor `backend/schema.sql` di phpMyAdmin, (2) buat `backend/config.php` dari
-`backend/config.example.php` (isi kredensial MySQL + `api_key`). Bila URL tidak di-*dart-define*,
-isi `web/config.json` (lihat `lib/env/app_config.dart`).
 
 ### 9.4 Opsional — QR Stiker Menunjuk Halaman Web Publik
 
@@ -619,7 +609,7 @@ Vercel (Git integration) otomatis rebuild dari `outputDirectory` = `web-deploy`.
 
 ```bash
 dart analyze --no-fatal-warnings   # analisis statis (hasil: No issues found!)
-flutter test                      # 54 test otomatis
+flutter test                      # 5 file test, 19 test otomatis
 ```
 
 Pengaturan aturan kode ada di `analysis_options.yaml` (menggunakan `flutter_lints`).
@@ -672,7 +662,7 @@ memakai SQLite browser (`sqlite3.wasm`) sehingga tidak bergantung pada API terse
 | **Upsert**      | Menyisipkan data baru, atau memperbarui bila Kode Inventaris sudah ada. |
 | **Cache**       | Salinan data di memori agar aplikasi cepat tanpa perlu unduhan ulang.   |
 | **PWA**         | Web App yang bisa "diinstall" di layar utama HP.                        |
-| **Realtime**    | Data berubah otomatis tiap ~5 detik di semua perangkat (polling). |
+| **Realtime**    | Data berubah otomatis di semua perangkat tanpa tombol refresh.          |
 
 
 ---
@@ -681,12 +671,12 @@ memakai SQLite browser (`sqlite3.wasm`) sehingga tidak bergantung pada API terse
 
 > Aplikasi **Inventaris Spek Komputer DPR** dibuat dengan **bahasa Dart** menggunakan  
 > **framework Flutter** (versi 2.0.0+3). Data disimpan di **SQLite** (`sqflite`) untuk mode  
-> offline dan disinkronkan ke **MySQL (REST API PHP)** untuk mode cloud. Aplikasi dapat berjalan  
+> offline dan disinkronkan ke **Supabase (PostgreSQL)** untuk mode cloud. Aplikasi dapat berjalan  
 > di **Android, iOS, dan Web (PWA)** dari satu basis kode. Fitur utamanya: inventaris perangkat  
 > (Computer/Laptop/Printer) dengan master data **PLAN** dan **Bagian**, dashboard statistik  
 > spesifikasi, scanner QR/barcode, serta pembuatan **barcode PNG, PDF A4, dan stiker PDF**  
 > **157×63 mm**. Ekspor ke **Excel multi-sheet** (3 sheet) dan **CSV**; impor membaca seluruh sheet  
 > secara toleran. Keamanan menggunakan **PIN yang di-hash SHA-256**. Kode inventaris dibuat  
 > otomatis berawalan **K / L / P** dengan nomor 3 digit. Seluruh kode lolos `dart analyze` (No  
-> issues) dan 54 pengujian otomatis.
+> issues) dan 19 pengujian otomatis.
 

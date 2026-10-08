@@ -56,7 +56,7 @@ class _ChangePinPageState extends State<ChangePinPage> {
       _busy = true;
       _error = '';
     });
-    // Ubah PIN ke cloud → semua perangkat lain ikut berubah (sinkron polling).
+    // Ubah PIN ke cloud → semua perangkat lain ikut berubah (real-time).
     final ok = await DbHelper.instance.changePin(oldP, newP);
     if (!mounted) return;
     setState(() => _busy = false);

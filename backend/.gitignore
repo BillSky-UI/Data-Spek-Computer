@@ -1,5 +1,0 @@
-# Kredensial database — jangan pernah di-commit.
-config.php
-# Hasil pratinjau lokal (mode SQLite)
-*.db
-*.db-journal
