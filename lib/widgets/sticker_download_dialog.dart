@@ -37,38 +37,73 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
     '2TB',
   ];
 
+  /// Tipe media penyimpanan yang bisa dipilih tiap ukuran storage.
+  static const List<String> _typeOptions = ['SSD', 'HDD'];
+
   bool _busy = false;
 
-  /// Jumlah unit tiap ukuran storage yang dipilih untuk dicetak (boleh lebih
-  /// dari satu ukuran, tiap ukuran bisa lebih dari satu unit). Diinput nilai
+  /// Jumlah unit tiap ukuran + tipe storage yang dipilih untuk dicetak (boleh
+  /// lebih dari satu ukuran, tiap ukuran bisa lebih dari satu unit). Kunci map
+  /// berbentuk `kapasitas spasi tipe`, misal `256 GB SSD`. Diinput nilai
   /// `storage` di database sering tidak konsisten namanya (mis. "256GB SSD
-  /// Sata"), jadi saat cetak bisa dipilih ulang dengan rapi, misal 256 GB ada
-  /// 2 unit + 128 GB ada 3 unit.
+  /// Sata"), jadi saat cetak bisa dipilih ulang dengan rapi, misal 256 GB SSD
+  /// ada 2 unit + 128 GB HDD ada 3 unit.
   final Map<String, int> _storageCount = <String, int>{};
+
+  /// Pilihan tipe (SSD/HDD) per ukuran; kosong = pakai [_typeOf] bawaan.
+  final Map<String, String> _storageType = <String, String>{};
 
   Device get _d => widget.device;
   String get _safeKode =>
       _d.kodeInventaris.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
   String get _fileName => 'Stiker_$_safeKode.pdf';
 
-  /// Tinggal format cetak untuk ukuran yang dipilih.
+  /// Tinggal format cetak untuk ukuran + tipe yang dipilih.
   ///
-  /// Kapasitas ditulis dulu lalu jumlah unitnya ("256GB 3x") supaya urutannya
-  /// sama dengan data asal di perangkat. Spasi antara angka dan satuan dihapus
-  /// agar ringkas saat dicetak, dan jumlah 1 unit tidak diulang.
+  /// Kapasitas ditulis dulu lalu jumlah unitnya ("256GB SSD 3x") supaya
+  /// urutannya sama dengan data asal di perangkat. Spasi antara angka dan
+  /// satuan dihapus agar ringkas, spasi sebelum tipe (SSD/HDD) tetap dijaga
+  /// supaya terbaca, dan jumlah 1 unit tidak diulang.
   String _formatStorage(String o, int n) {
-    final kapasitas = o.replaceAll(' ', '');
-    return n == 1 ? kapasitas : '$kapasitas ${n}x';
+    final teks = o
+        .replaceAll(' ', '')
+        .replaceAllMapped(
+          RegExp(r'(SSD|HDD)$'),
+          (m) => ' ${m[1]}',
+        );
+    return n == 1 ? teks : '$teks ${n}x';
   }
 
   /// Total unit storage yang dicetak, untuk ringkasan di bawah daftar.
   int get _totalUnit => _storageCount.values.fold(0, (a, b) => a + b);
 
-  /// Ringkasan storage terpilih, misal "256GB 3x + 128GB 2x".
-  String get _storageTerpilih => _storageOptions
-      .where((o) => (_storageCount[o] ?? 0) > 0)
-      .map((o) => _formatStorage(o, _storageCount[o]!))
-      .join(' + ');
+  /// Kunci map untuk (ukuran, tipe), misal `'256 GB SSD'`.
+  String _entryKey(String size, String tipe) => '$size $tipe';
+
+  /// Tipe bawaan tiap ukuran: SSD, kecuali data asli berisi "HDD".
+  String _typeOf(String size) {
+    final tersimpan = _storageType[size];
+    if (tersimpan != null) return tersimpan;
+    return _d.storage.toLowerCase().contains('hdd') ? 'HDD' : 'SSD';
+  }
+
+  /// Posisi ukuran dalam daftar [_storageOptions], dipakai untuk mengurutkan
+  /// ringkasan supaya urutannya sama dengan daftarnya.
+  int _indexOfSize(String key) {
+    for (var i = 0; i < _storageOptions.length; i++) {
+      if (key.startsWith('${_storageOptions[i]} ')) return i;
+    }
+    return _storageOptions.length;
+  }
+
+  /// Ringkasan storage terpilih, misal "256GB SSD 3x + 128GB HDD 2x".
+  String get _storageTerpilih {
+    final keys = _storageCount.keys.toList()..sort((a, b) {
+      final i = _indexOfSize(a).compareTo(_indexOfSize(b));
+      return i != 0 ? i : a.compareTo(b);
+    });
+    return keys.map((k) => _formatStorage(k, _storageCount[k]!)).join(' + ');
+  }
 
   Future<Uint8List> _build() {
     if (_storageTerpilih.isNotEmpty) {
@@ -151,24 +186,23 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
     }
   }
 
-  /// Satu baris ukuran storage: label + stepper jumlah unit (- 0 +).
-  /// Barisnya bisa diklik untuk menambah 1 unit, jadi tidak harus Precis ke
-  /// tombol "+" di layar sentuh.
-  Widget _storageRow(String o, int n) {
+  /// Satu baris ukuran storage: label + pemilih tipe (SSD/HDD) + stepper
+  /// jumlah unit (- 0 +). Barisnya bisa diklik untuk menambah 1 unit.
+  Widget _storageRow(String size, int n) {
     final c = context.appColors;
     final dipakai = n > 0;
     return Material(
       color: dipakai ? c.blue.withValues(alpha: 0.08) : Colors.transparent,
       child: Clickable(
         child: InkWell(
-        onTap: () => _ubahStorage(o, 1),
+        onTap: () => _ubahStorage(size, 1),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
           child: Row(
             children: [
               Expanded(
                 child: Text(
-                  o,
+                  size,
                   style: TextStyle(
                     color: dipakai ? c.textPrimary : c.textMuted,
                     fontSize: 12,
@@ -176,22 +210,13 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
                   ),
                 ),
               ),
-              if (dipakai)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Text(
-                    _formatStorage(o, n),
-                    style: TextStyle(
-                      color: c.blue,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+              const SizedBox(width: 8),
+              _typeToggle(size),
+              const SizedBox(width: 6),
               _stepper(
-                  icon: Icons.remove, onTap: n > 0 ? () => _ubahStorage(o, -1) : null),
+                  icon: Icons.remove, onTap: n > 0 ? () => _ubahStorage(size, -1) : null),
               SizedBox(
-                width: 26,
+                width: 24,
                 child: Text(
                   '$n',
                   textAlign: TextAlign.center,
@@ -202,10 +227,57 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
                   ),
                 ),
               ),
-              _stepper(icon: Icons.add, onTap: () => _ubahStorage(o, 1)),
+              _stepper(icon: Icons.add, onTap: () => _ubahStorage(size, 1)),
             ],
           ),
         ),
+        ),
+      ),
+    );
+  }
+
+  /// Pilih tipe storage (SSD/HDD) untuk satu ukuran.
+  Widget _typeToggle(String size) {
+    final c = context.appColors;
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surfaceAlt,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: c.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < _typeOptions.length; i++) ...[
+            if (i > 0) Container(width: 1, height: 16, color: c.border),
+            _typeChip(size, _typeOptions[i]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _typeChip(String size, String tipe) {
+    final c = context.appColors;
+    final aktif = _typeOf(size) == tipe;
+    return Clickable(
+      child: InkWell(
+        onTap: () => _gantiTipe(size, tipe),
+        borderRadius: BorderRadius.circular(7),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          decoration: BoxDecoration(
+            color: aktif ? c.blue.withValues(alpha: 0.14) : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Text(
+            tipe,
+            style: TextStyle(
+              color: aktif ? c.blue : c.textMuted,
+              fontSize: 10,
+              fontWeight: aktif ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
         ),
       ),
     );
@@ -234,14 +306,27 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
     );
   }
 
-  void _ubahStorage(String o, int delta) {
+  void _ubahStorage(String size, int delta) {
     setState(() {
-      final hasil = (_storageCount[o] ?? 0) + delta;
+      final key = _entryKey(size, _typeOf(size));
+      final hasil = (_storageCount[key] ?? 0) + delta;
       if (hasil <= 0) {
-        _storageCount.remove(o);
+        _storageCount.remove(key);
       } else {
-        _storageCount[o] = hasil;
+        _storageCount[key] = hasil;
       }
+    });
+  }
+
+  /// Ganti tipe (SSD/HDD) untuk satu ukuran. Jumlah unit yang sudah dipilih
+  /// ikut dipindahkan ke tipe baru supaya nilainya tidak hilang.
+  void _gantiTipe(String size, String tipe) {
+    if (_typeOf(size) == tipe) return;
+    setState(() {
+      final keyLama = _entryKey(size, _typeOf(size));
+      final jum = _storageCount.remove(keyLama) ?? 0;
+      if (jum > 0) _storageCount[_entryKey(size, tipe)] = jum;
+      _storageType[size] = tipe;
     });
   }
 
@@ -342,7 +427,7 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
               if (!_isPrinter) ...[
                 const SizedBox(height: 14),
                 Text(
-                  'Storage yang dicetak (boleh lebih dari satu)',
+                  'Storage yang dicetak (pilih kapasitas + tipe)',
                   style: TextStyle(
                     color: c.textPrimary,
                     fontSize: 12,
@@ -351,7 +436,8 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Ketuk baris untuk +1 unit, atau pakai tombol - / +.',
+                  'Pilih SSD atau HDD, ketuk baris untuk +1 unit, '
+                  'atau pakai tombol - / +.',
                   style: TextStyle(color: c.textMuted, fontSize: 11),
                 ),
                 const SizedBox(height: 10),
@@ -368,7 +454,12 @@ class _StickerDownloadDialogState extends State<StickerDownloadDialog> {
                           Divider(height: 1, thickness: 1, color: c.border),
                         _storageRow(
                           _storageOptions[i],
-                          _storageCount[_storageOptions[i]] ?? 0,
+                          _storageCount[
+                                  _entryKey(
+                                    _storageOptions[i],
+                                    _typeOf(_storageOptions[i]),
+                                  )] ??
+                              0,
                         ),
                       ],
                     ],
