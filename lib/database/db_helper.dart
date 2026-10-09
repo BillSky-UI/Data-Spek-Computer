@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../env/app_config.dart';
 import '../models/device.dart';
 import '../services/pin_controller.dart';
+import '../utils/kode_generator.dart';
 import 'local_database.dart';
 
 /// Hasil operasi hapus master (Bagian/PLAN).
@@ -343,23 +344,27 @@ class DbHelper extends ChangeNotifier {
     return null;
   }
 
+  /// Kode inventaris berikutnya untuk kategori: pakai nomor terkecil yang
+  /// belum terpakai (mulai dari 1). Jadi kalau sebuah kode dihapus di cloud,
+  /// penambahan berikutnya otomatis mengisi kode kosong itu dulu.
   Future<String> nextKode(String category) async {
     if (localMode) return LocalDatabase.instance.nextKode(category);
     if (_devices.isEmpty && _client != null) {
       await _fetchAll();
     }
     final prefix = _prefixFor(category);
-    var maxNum = 0;
+    final used = <int>{};
     final regex =
         RegExp('^${RegExp.escape(prefix)}-(\\d+)', caseSensitive: false);
     for (final d in _devices) {
       final m = regex.firstMatch(d.kodeInventaris);
       if (m != null) {
         final n = int.tryParse(m.group(1)!) ?? 0;
-        if (n > maxNum) maxNum = n;
+        if (n > 0) used.add(n);
       }
     }
-    return '$prefix-${(maxNum + 1).toString().padLeft(3, '0')}';
+    final next = nomorKodeBebas(used);
+    return '$prefix-${next.toString().padLeft(3, '0')}';
   }
 
   static String _prefixFor(String category) {

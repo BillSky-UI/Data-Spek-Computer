@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../models/device.dart';
+import '../utils/kode_generator.dart';
 import 'web_db_factory.dart';
 
 /// Penyimpanan lokal (SQLite) sebagai fallback saat cloud tidak tersedia.
@@ -188,21 +189,25 @@ class LocalDatabase {
     return 'K';
   }
 
+  /// Kode inventaris berikutnya untuk kategori: pakai nomor terkecil yang
+  /// belum terpakai (mulai dari 1). Jadi kalau sebuah kode dihapus (misal
+  /// K-003), penambahan berikutnya otomatis mengisi kode kosong itu dulu.
   Future<String> nextKode(String category) async {
     final prefix = _prefixFor(category);
     final db = await database;
     final rows = await db.query(_tableDevices, columns: ['kode_inventaris']);
-    var maxNum = 0;
+    final used = <int>{};
     final regex = RegExp('^${RegExp.escape(prefix)}-(\\d+)',
         caseSensitive: false);
     for (final r in rows) {
       final m = regex.firstMatch((r['kode_inventaris'] ?? '').toString());
       if (m != null) {
         final n = int.tryParse(m.group(1)!) ?? 0;
-        if (n > maxNum) maxNum = n;
+        if (n > 0) used.add(n);
       }
     }
-    return '$prefix-${(maxNum + 1).toString().padLeft(3, '0')}';
+    final next = nomorKodeBebas(used);
+    return '$prefix-${next.toString().padLeft(3, '0')}';
   }
 
   int _byKode(Device a, Device b) {
