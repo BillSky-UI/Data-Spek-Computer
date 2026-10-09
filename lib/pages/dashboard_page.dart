@@ -12,6 +12,7 @@ import 'category_picker_page.dart';
 import 'device_form_page.dart';
 import 'scan_page.dart';
 import 'spec_breakdown_page.dart';
+import 'stats_page.dart';
 import 'sticker_detail_page.dart';
 
 /// Definisi kategori spesifikasi yang ditampilkan sebagai kartu grid 2 kolom.
@@ -178,6 +179,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                 children: [
                   _summaryRow(context),
+                  const SizedBox(height: 10),
+                  _statsBanner(context),
                   const SizedBox(height: 16),
                   _filters(context),
                   const SizedBox(height: 16),
@@ -191,6 +194,64 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             ),
+    );
+  }
+
+  // ---------- Banner Statistik Lengkap ----------
+  Widget _statsBanner(BuildContext context) {
+    final c = context.appColors;
+    return Material(
+      color: Colors.transparent,
+      child: Clickable(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => StatsPage(devices: List.of(_filtered))),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: c.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: c.border),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: c.stickerChipBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.bar_chart, color: c.accent, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('STATISTIK LENGKAP',
+                          style: TextStyle(
+                              color: c.textPrimary,
+                              fontSize: 13,
+                              letterSpacing: 0.4,
+                              fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 3),
+                      Text('Per kategori, bagian, PLAN & status perbaikan '
+                          '(${_filtered.length})',
+                          style: TextStyle(color: c.textMuted, fontSize: 11.5)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: c.textMuted, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

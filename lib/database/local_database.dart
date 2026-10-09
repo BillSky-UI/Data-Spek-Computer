@@ -3,6 +3,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../models/activity_log.dart';
 import '../models/device.dart';
 import '../utils/kode_generator.dart';
 import 'web_db_factory.dart';
@@ -15,10 +16,11 @@ class LocalDatabase {
   static final LocalDatabase instance = LocalDatabase._();
 
   static const _dbName = 'inventaris_local.db';
-  static const _dbVersion = 2;
+  static const _dbVersion = 3;
   static const _tableDevices = 'devices';
   static const _tableBagian = 'bagian_master';
   static const _tablePlan = 'plan_master';
+  static const _tableLog = 'activity_log';
 
   Database? _db;
 
@@ -45,6 +47,20 @@ class LocalDatabase {
   /// hanya menambah kolom bila belum tersedia.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     await _ensureColumns(db);
+    await _ensureLogTable(db);
+  }
+
+  Future<void> _ensureLogTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $_tableLog (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        action TEXT NOT NULL,
+        kode TEXT NOT NULL,
+        device_name TEXT NOT NULL,
+        detail TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL
+      )
+    ''');
   }
 
   Future<void> _ensureColumns(Database db) async {
@@ -94,6 +110,7 @@ class LocalDatabase {
     ''');
     await db.insert(_tablePlan, {'name': 'Sentul'},
         conflictAlgorithm: ConflictAlgorithm.ignore);
+    await _ensureLogTable(db);
   }
 
   // ============================================================
@@ -385,5 +402,33 @@ class LocalDatabase {
     final rows = await db.rawQuery(
         "SELECT DISTINCT plan FROM $_tableDevices WHERE plan IS NOT NULL AND plan != '' ORDER BY plan ASC");
     return rows.map((r) => (r['plan'] ?? '').toString()).toList();
+  }
+
+  // ============================================================
+  //  RIWAYAT AKTIVITAS (audit trail lokal)
+  // ============================================================
+
+  /// Simpan satu baris log aktivitas di SQLite.
+  Future<int> addActivityLog(ActivityLog log) async {
+    final db = await database;
+    final payload = {...log.toMap()}..remove('id');
+    return db.insert(_tableLog, payload);
+  }
+
+  /// Ambil log terbaru sampai [limit] baris (terurut waktu terbawah).
+  Future<List<ActivityLog>> getActivityLog({int limit = 200}) async {
+    final db = await database;
+    final rows = await db.query(
+      _tableLog,
+      orderBy: 'id DESC',
+      limit: limit,
+    );
+    return rows.map(ActivityLog.fromMap).toList();
+  }
+
+  /// Bersihkan seluruh riwayat aktivitas lokal.
+  Future<void> clearActivityLog() async {
+    final db = await database;
+    await db.delete(_tableLog);
   }
 }

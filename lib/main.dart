@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,6 +8,7 @@ import 'database/db_helper.dart';
 import 'env/app_config.dart';
 import 'pages/main_shell.dart';
 import 'pages/pin_login_page.dart';
+import 'services/export_service.dart';
 import 'services/settings_controller.dart';
 import 'theme/app_theme.dart';
 
@@ -29,7 +32,26 @@ Future<void> main() async {
   // Seeding otomatis dari Excel jika database cloud masih kosong.
   await DbHelper.instance.seedIfEmpty();
 
+  // Backup terjadwal: cek sekali saat aplikasi dibuka. Tidak menunggu hasil
+  // agar aplikasi tetap langsung tampil; hasil hanya dicatat di log.
+  if (settings.backupDue) {
+    unawaited(_autoBackup(settings));
+  }
+
   runApp(SpekKomputerApp(settings: settings));
+}
+
+/// Backup otomatis diam-diam: ekspor Excel ke folder Download lalu catat
+/// waktu terakhir. Gagal ditoleransi (dicatat saja, tidak mengganggu).
+Future<void> _autoBackup(SettingsController settings) async {
+  try {
+    final devices = await DbHelper.instance.getAll();
+    final saved = await ExportService.instance.saveExcelToDownloads(devices);
+    await settings.markBackupDone(DateTime.now());
+    debugPrintFallback('Backup otomatis selesai: ${saved.path}');
+  } catch (e) {
+    debugPrintFallback('Backup otomatis gagal: $e');
+  }
 }
 
 class SpekKomputerApp extends StatefulWidget {

@@ -6,8 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../env/app_config.dart';
+import '../models/activity_log.dart';
 import '../models/device.dart';
 import '../services/pin_controller.dart';
+import '../utils/device_diff.dart';
 import '../utils/kode_generator.dart';
 import 'local_database.dart';
 
@@ -73,6 +75,7 @@ class DbHelper extends ChangeNotifier {
   static const String _tBagian = 'bagian';
   static const String _tPlan = 'plan';
   static const String _tSettings = 'app_settings';
+  static const String _tLog = 'activity_log';
 
   static const String _assetExcel = 'assets/seed_inventaris.xlsx';
   static const String _sheetName = 'Spesifikasi Komputer';
@@ -277,6 +280,15 @@ class DbHelper extends ChangeNotifier {
   }
 
   Future<int> insert(Device d) async {
+    final insertedId = await _insertCloud(d);
+    if (insertedId > 0) {
+      _logActivity('tambah', d.kodeInventaris, d.deviceName,
+          'Perangkat baru ditambahkan');
+    }
+    return insertedId;
+  }
+
+  Future<int> _insertCloud(Device d) async {
     if (localMode) return _insertLocal(d);
     if (_client == null) return 0;
     final payload = {...d.toMap()}..remove('id');
@@ -300,25 +312,31 @@ class DbHelper extends ChangeNotifier {
 
   Future<int> update(Device d) async {
     if (localMode) {
+      final lama = _cariDiCache(d);
       final r = await LocalDatabase.instance.update(d);
       await _reloadLocalCache();
       notifyListeners();
+      if (r > 0) _logPerubahan(lama, d);
       return r > 0 ? 1 : 0;
     }
     if (_client == null || d.id == null) return 0;
+    final lama = _cariDiCache(d);
     final payload = {...d.toMap()}..remove('id');
     await _client!.from(_tDevices).update(payload).eq('id', d.id!);
     _upsertLocal(d);
     _derivePlanMaster();
     notifyListeners();
+    _logPerubahan(lama, d);
     return 1;
   }
 
   Future<int> delete(int id) async {
+    final lama = _cariDiCacheById(id);
     if (localMode) {
       final n = await LocalDatabase.instance.delete(id);
       await _reloadLocalCache();
       notifyListeners();
+      if (n > 0) _logHapus(lama);
       return n > 0 ? 1 : 0;
     }
     if (_client == null) return 0;
@@ -326,7 +344,97 @@ class DbHelper extends ChangeNotifier {
     _devices.removeWhere((d) => d.id == id);
     _derivePlanMaster();
     notifyListeners();
+    _logHapus(lama);
     return 1;
+  }
+
+  Device? _cariDiCache(Device d) {
+    if (d.id != null) {
+      final byId = _devices.where((x) => x.id == d.id).toList();
+      if (byId.isNotEmpty) return byId.first;
+    }
+    final key = _kodeKey(d.kodeInventaris);
+    if (key.isEmpty) return null;
+    final byKode =
+        _devices.where((x) => _kodeKey(x.kodeInventaris) == key).toList();
+    return byKode.isEmpty ? null : byKode.first;
+  }
+
+  Device? _cariDiCacheById(int id) {
+    final byId = _devices.where((x) => x.id == id).toList();
+    return byId.isEmpty ? null : byId.first;
+  }
+
+  void _logPerubahan(Device? lama, Device d) {
+    final detail = diffDevice(lama, d);
+    _logActivity('ubah', d.kodeInventaris, d.deviceName,
+        detail.isEmpty ? 'Data perangkat diperbarui' : detail);
+  }
+
+  void _logHapus(Device? lama) {
+    _logActivity('hapus', lama?.kodeInventaris ?? '-',
+        lama?.deviceName ?? '-', 'Perangkat dihapus');
+  }
+
+  // ============================================================
+  //  RIWAYAT AKTIVITAS (audit trail)
+  // ============================================================
+
+  /// Catat satu aktivitas. Ditulis ke SQLite lokal (selalu) dan ke tabel
+  /// cloud (best-effort, anti-gagal). Dipanggil tanpa `await` agar tidak
+  /// memperlambat operasi yang dicatat.
+  void _logActivity(String action, String kode, String deviceName, String detail) {
+    final log = ActivityLog(
+      action: action,
+      kode: kode,
+      deviceName: deviceName,
+      detail: detail,
+      createdAt: DateTime.now().toIso8601String(),
+    );
+    try {
+      unawaited(LocalDatabase.instance.addActivityLog(log).then((_) {
+        _mirrorLogToCloud(log);
+      }).catchError((Object e) {
+        debugPrintFallback('[ActivityLog] gagal simpan lokal: $e');
+      }));
+    } catch (_) {
+      // abaikan — log tidak boleh memblokir operasi utama.
+    }
+  }
+
+  /// Salin log ke tabel cloud `activity_log` (tabel wajib dibuat lewat
+  /// supabase/schema.sql). Gagal diam-diam bila tabel belum ada/offline.
+  Future<void> _mirrorLogToCloud(ActivityLog log) async {
+    final client = _client;
+    if (client == null) return;
+    try {
+      await client.from(_tLog).insert(log.toCloudMap());
+    } catch (_) {
+      // tabel cloud belum tersedia → cukup tersimpan lokal.
+    }
+  }
+
+  /// Log aktivitas terbaru (dari SQLite lokal — selalu lengkap untuk
+  /// perangkat ini, karena setiap operasi menulis lokal dulu).
+  Future<List<ActivityLog>> getActivityLog({int limit = 200}) async {
+    try {
+      return await LocalDatabase.instance.getActivityLog(limit: limit);
+    } catch (e) {
+      debugPrintFallback('[ActivityLog] gagal baca: $e');
+      return const [];
+    }
+  }
+
+  /// Hapus seluruh riwayat (lokal + cloud best-effort).
+  Future<void> clearActivityLog() async {
+    try {
+      await LocalDatabase.instance.clearActivityLog();
+    } catch (_) {}
+    final client = _client;
+    if (client == null) return;
+    try {
+      await client.from(_tLog).delete().neq('id', 0);
+    } catch (_) {}
   }
 
   Future<Device?> getByKode(String kode) async {
@@ -795,12 +903,17 @@ class DbHelper extends ChangeNotifier {
         // Sinkronkan juga ke cache lokal agar PIN tetap berfungsi saat
         // offline / PIN cloud belum diisi.
         await PinController.instance.savePin(np);
+        _logActivity('pin', '-', '-', 'PIN aplikasi diubah');
         return true;
       } catch (_) {
         return false;
       }
     }
-    return PinController.instance.changePin(oldPin, np);
+    final ok = await PinController.instance.changePin(oldPin, np);
+    if (ok) {
+      _logActivity('pin', '-', '-', 'PIN aplikasi diubah');
+    }
+    return ok;
   }
 
   // ============================================================
@@ -858,6 +971,7 @@ class DbHelper extends ChangeNotifier {
       await LocalDatabase.instance.seedIfEmpty(data);
       await _reloadLocalCache();
       notifyListeners();
+      _logActivity('reset', '-', '-', 'Semua data diperbarui ulang dari Excel ($data.length perangkat)');
       return data.length;
     }
     if (_client == null) return 0;
@@ -869,6 +983,7 @@ class DbHelper extends ChangeNotifier {
           );
       await _ensureMastersFromDevices();
     }
+    _logActivity('reset', '-', '-', 'Semua data diperbarui ulang dari Excel ($data.length perangkat)');
     return data.length;
   }
 
@@ -1098,6 +1213,7 @@ class DbHelper extends ChangeNotifier {
     }
     await _ensureMastersFromDevices();
     notifyListeners();
+    _logActivity('import', '-', '-', 'Impor dari file Excel: $data.length perangkat');
     return data.length;
   }
 

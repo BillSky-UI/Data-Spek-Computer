@@ -7,6 +7,7 @@ import '../services/saved_target.dart';
 import '../services/settings_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/clickable.dart';
+import 'activity_log_page.dart';
 import 'change_pin_page.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -50,6 +51,50 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  /// Backup manual sekarang (Excel ke Download) lalu catat waktu terakhir.
+  Future<void> _backupNow() async {
+    setState(() => _busy = true);
+    try {
+      final devices = await DbHelper.instance.getAll();
+      final saved =
+          await ExportService.instance.saveExcelToDownloads(devices);
+      await widget.settings.markBackupDone(DateTime.now());
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content:
+                Text('Backup tersimpan di ${saved.location}: ${saved.path}')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Backup gagal: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _setBackupEnabled(bool v) async {
+    await widget.settings.setBackupEnabled(v);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _setBackupInterval(int days) async {
+    await widget.settings.setBackupIntervalDays(days);
+    if (mounted) setState(() {});
+  }
+
+  String _waktuBackup() {
+    final iso = widget.settings.lastBackupAt;
+    if (iso == null || iso.isEmpty) return 'Belum pernah';
+    final dt = DateTime.tryParse(iso)?.toLocal();
+    if (dt == null) return 'Belum pernah';
+    String p2(int n) => n.toString().padLeft(2, '0');
+    return '${p2(dt.day)}/${p2(dt.month)}/${dt.year} · '
+        '${p2(dt.hour)}:${p2(dt.minute)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
@@ -87,6 +132,20 @@ class _SettingsPageState extends State<SettingsPage> {
                   ],
                 ),
                 const SizedBox(height: 20),
+                _sectionTitle(context, 'Riwayat'),
+                _card(
+                  context,
+                  children: [
+                    _actionTile(context, Icons.history, 'Riwayat Aktivitas',
+                        'Audit trail tambah/ubah/hapus perangkat', () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const ActivityLogPage()));
+                    }),
+                  ],
+                ),
+                const SizedBox(height: 20),
                 _sectionTitle(context, 'Master Data'),
                 const SizedBox(height: 8),
                 _masterCard(context),
@@ -100,6 +159,56 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(height: 6),
                     _actionTile(context, Icons.description, 'Ekspor ke CSV',
                         'Simpan .csv ke folder Download HP', () => _export('csv')),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _sectionTitle(context, 'Backup Otomatis'),
+                _card(
+                  context,
+                  children: [
+                    Clickable(
+                      child: SwitchListTile(
+                        value: widget.settings.backupEnabled,
+                        title: Text('Backup otomatis',
+                            style: TextStyle(
+                                color: c.textPrimary, fontSize: 14)),
+                        subtitle: Text(
+                            'Simpan salinan Excel ke Download sesuai jadwal',
+                            style:
+                                TextStyle(color: c.textMuted, fontSize: 12)),
+                        onChanged: _setBackupEnabled,
+                      ),
+                    ),
+                    Divider(height: 1, color: c.border),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.schedule, color: c.blue, size: 22),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Jadwal backup',
+                                    style: TextStyle(
+                                        color: c.textPrimary, fontSize: 14)),
+                                const SizedBox(height: 6),
+                                _intervalChip(context, 1, 'Harian'),
+                                const SizedBox(width: 8),
+                                _intervalChip(context, 7, 'Mingguan'),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: c.border),
+                    _infoTile(context, Icons.history, 'Terakhir backup',
+                        _waktuBackup()),
+                    Divider(height: 1, color: c.border),
+                    _actionTile(context, Icons.backup, 'Backup Sekarang',
+                        'Ekspor .xlsx ke folder Download HP', _backupNow),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -224,6 +333,33 @@ class _SettingsPageState extends State<SettingsPage> {
       title: Text(label, style: TextStyle(color: c.textMuted, fontSize: 13)),
       subtitle: Text(value,
           style: TextStyle(color: c.textPrimary, fontSize: 14)),
+    );
+  }
+
+  Widget _intervalChip(BuildContext context, int days, String label) {
+    final c = context.appColors;
+    final selected = widget.settings.backupIntervalDays == days;
+    return Clickable(
+      child: ChoiceChip(
+        selected: selected,
+        showCheckmark: false,
+        avatar: Icon(
+          days == 1 ? Icons.today : Icons.event_repeat,
+          size: 15,
+          color: selected ? c.onAccent : c.textMuted,
+        ),
+        label: Text(label,
+            style: TextStyle(
+                color: selected ? c.onAccent : c.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600)),
+        backgroundColor: c.surfaceAlt,
+        selectedColor: c.accent,
+        side: BorderSide(color: selected ? c.accent : c.border, width: 1),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        onSelected: (_) => _setBackupInterval(days),
+      ),
     );
   }
 

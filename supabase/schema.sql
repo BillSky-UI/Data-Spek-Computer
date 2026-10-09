@@ -59,6 +59,19 @@ create table if not exists public.app_settings (
 insert into public.app_settings (id, pin_hash)
 values (1, '') on conflict (id) do nothing;
 
+-- Riwayat aktivitas (audit trail): tambah/ubah/hapus perangkat, ganti PIN,
+-- impor/reseed. Ditulis aplikasi lewat key publik; dibaca di halaman Riwayat.
+create table if not exists public.activity_log (
+  id bigint generated always as identity primary key,
+  action text not null,
+  kode text not null,
+  device_name text not null,
+  detail text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists activity_log_created_at_idx
+  on public.activity_log (created_at desc, id desc);
+
 -- ------------------------------------------------------------
 -- REALTIME (aman dijalankan ulang)
 -- ------------------------------------------------------------
@@ -66,6 +79,7 @@ alter table public.devices replica identity full;
 alter table public.bagian replica identity full;
 alter table public.plan replica identity full;
 alter table public.app_settings replica identity full;
+alter table public.activity_log replica identity full;
 
 do $$
 begin
@@ -91,6 +105,12 @@ begin
 exception when duplicate_object then null;
 end $$;
 
+do $$
+begin
+  alter publication supabase_realtime add table public.activity_log;
+exception when duplicate_object then null;
+end $$;
+
 -- ------------------------------------------------------------
 -- ROW LEVEL SECURITY
 -- Aplikasi memakai key publik (anonymous) tanpa login, sehingga
@@ -101,6 +121,7 @@ alter table public.devices enable row level security;
 alter table public.bagian enable row level security;
 alter table public.plan enable row level security;
 alter table public.app_settings enable row level security;
+alter table public.activity_log enable row level security;
 
 -- devices
 do $$
@@ -177,5 +198,22 @@ end $$;
 do $$
 begin
   create policy "anon update app_settings" on public.app_settings for update using (true) with check (true);
+exception when duplicate_object then null;
+end $$;
+
+-- activity_log
+do $$
+begin
+  create policy "anon select activity_log" on public.activity_log for select using (true);
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy "anon insert activity_log" on public.activity_log for insert with check (true);
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy "anon delete activity_log" on public.activity_log for delete using (true);
 exception when duplicate_object then null;
 end $$;
