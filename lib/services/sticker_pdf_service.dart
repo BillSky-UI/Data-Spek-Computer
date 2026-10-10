@@ -33,6 +33,18 @@ class PrinterStikerJob {
   final Uint8List? fontBytes;
 }
 
+/// Kumpulan stiker untuk cetak massal (boleh campur kategori). Dikirim ke
+/// isolate latar sebagai satu dokumen PDF dengan satu halaman per perangkat.
+class StikerBatchJob {
+  const StikerBatchJob(this.reguler, this.printer);
+
+  /// Computer/Laptop (stiker 15,5 x 6 cm).
+  final List<StikerJob> reguler;
+
+  /// Printer (label 7,6 x 3,8 cm).
+  final List<PrinterStikerJob> printer;
+}
+
 /// Generator PDF stiker. Ada dua desain, dipilih otomatis dari kategori:
 ///
 /// 1. **Inventaris & Spesifikasi** (Computer/Laptop) - meniru
@@ -270,10 +282,64 @@ class StickerPdfService {
     return compute(_rakitStiker, StikerJob(d, logo1, logo2));
   }
 
+  /// Bangun satu dokumen PDF berisi banyak stiker (cetak massal).
+  ///
+  /// Aset gambar dibaca SEKALI lalu dikirim ke isolate latar sebagai
+  /// [StikerBatchJob]; dokumen berisi satu halaman per perangkat dengan
+  /// kertas sesuai kategorinya (Computer/Laptop 155 x 60 mm, Printer
+  /// 76 x 38 mm). Urutan perangkat dipertahankan seperti yang diberikan.
+  Future<Uint8List> buildStickerBatch(List<Device> devices) async {
+    if (devices.isEmpty) {
+      return pw.Document().save();
+    }
+    final reguler = <StikerJob>[];
+    final printer = <PrinterStikerJob>[];
+    final logo1 = await _muatLogo('assets/img/stiker_header.png');
+    final logo2 = await _muatLogo('assets/img/logo_dpr_small.png');
+    final bg = await _muatLogo(_printerBgAsset);
+    final font = await _muatLogo(_printerFontAsset);
+    for (final d in devices) {
+      if (categoryKey(d.category) == 'Printer') {
+        printer.add(PrinterStikerJob(d, bg, font));
+      } else {
+        reguler.add(StikerJob(d, logo1, logo2));
+      }
+    }
+    return compute(_rakitBatch, StikerBatchJob(reguler, printer));
+  }
+
+  /// Rakit seluruh halaman stiker ke satu dokumen di isolate latar.
+  static Future<Uint8List> _rakitBatch(StikerBatchJob job) {
+    final doc = pw.Document();
+    for (final j in job.reguler) {
+      doc.addPage(_stikerPage(j));
+    }
+    for (final j in job.printer) {
+      doc.addPage(_printerPage(j));
+    }
+    return doc.save();
+  }
+
   static Future<Uint8List> _rakitStiker(StikerJob job) {
+    final doc = pw.Document();
+    doc.addPage(_stikerPage(job));
+    return doc.save();
+  }
+
+  /// Satu halaman stiker inventaris (Computer/Laptop), kertas 155 x 60 mm.
+  static pw.Page _stikerPage(StikerJob job) {
+    final m = PdfPageFormat.mm;
+    return pw.Page(
+      pageFormat: PdfPageFormat(paperW * m, paperH * m),
+      margin: pw.EdgeInsets.zero,
+      build: (_) => pw.Stack(children: _childrenStiker(job)),
+    );
+  }
+
+  /// Isi satu label stiker Inventaris & Spesifikasi 15,5 x 6 cm.
+  static List<pw.Widget> _childrenStiker(StikerJob job) {
     final d = job.d;
     final m = PdfPageFormat.mm;
-    final doc = pw.Document();
     final bold = pw.Font.helveticaBold();
     final reg = pw.Font.helvetica();
 
@@ -515,19 +581,27 @@ class StickerPdfService {
       );
     }
 
-    doc.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat(paperW * m, paperH * m),
-        margin: pw.EdgeInsets.zero,
-        build: (_) => pw.Stack(children: list),
-      ),
-    );
+    return list;
+  }
 
+  static Future<Uint8List> _rakitStikerPrinter(PrinterStikerJob job) {
+    final doc = pw.Document();
+    doc.addPage(_printerPage(job));
     return doc.save();
   }
 
-  /// Membangun stiker printer: gambar desain sebagai latar penuh, lalu lima
-  /// nilai data ditulis di posisinya masing-masing.
+  /// Satu halaman label printer 76,03 x 38,02 mm (latar gambar desain).
+  static pw.Page _printerPage(PrinterStikerJob job) {
+    final m = PdfPageFormat.mm;
+    return pw.Page(
+      pageFormat: PdfPageFormat(printerW * m, printerH * m),
+      margin: pw.EdgeInsets.zero,
+      build: (_) => pw.Stack(children: _childrenStikerPrinter(job)),
+    );
+  }
+
+  /// Isi label printer: gambar desain sebagai latar penuh, lalu lima nilai
+  /// data ditulis di posisinya masing-masing.
   ///
   /// Pemetaan data (lihat `printerSpecLabel` di `lib/utils/field_groups.dart`):
   /// - Nama Barang       -> `prosesor` (label form "Tipe / Model Printer")
@@ -537,10 +611,9 @@ class StickerPdfService {
   /// - Tanggal Penyerahan -> `tanggalEvaluasi` (kolom "Tgl.Penyerahan")
   ///
   /// Desain tidak punya kolom Keterangan, jadi `keterangan` tidak dicetak.
-  static Future<Uint8List> _rakitStikerPrinter(PrinterStikerJob job) {
+  static List<pw.Widget> _childrenStikerPrinter(PrinterStikerJob job) {
     final d = job.d;
     final m = PdfPageFormat.mm;
-    final doc = pw.Document();
 
     // Font desain: Calibri-Bold 6 pt -> Carlito-Bold (klon open-source yang
     // metriknya identik). Kalau byte font gagal dimuat, fallback ke
@@ -614,15 +687,7 @@ class StickerPdfService {
       ..add(tulis(d.kodeInventaris, _pKodeX, _pKodeY, _pKodeW))
       ..add(tulis(d.tanggalEvaluasi, _pTglX, _pTglY, _pTglW));
 
-    doc.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat(printerW * m, printerH * m),
-        margin: pw.EdgeInsets.zero,
-        build: (_) => pw.Stack(children: list),
-      ),
-    );
-
-    return doc.save();
+    return list;
   }
 
   /// Menempatkan satu nilai pada baseline tertentu (mm dari tepi atas label).

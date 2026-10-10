@@ -8,7 +8,9 @@ import '../services/settings_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/clickable.dart';
 import 'activity_log_page.dart';
+import 'bulk_sticker_page.dart';
 import 'change_pin_page.dart';
+import 'kode_ganda_page.dart';
 
 class SettingsPage extends StatefulWidget {
   final SettingsController settings;
@@ -159,6 +161,36 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(height: 6),
                     _actionTile(context, Icons.description, 'Ekspor ke CSV',
                         'Simpan .csv ke folder Download HP', () => _export('csv')),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _sectionTitle(context, 'Pemeliharaan Data'),
+                _card(
+                  context,
+                  children: [
+                    _actionTile(
+                        context,
+                        Icons.sticky_note_2_outlined,
+                        'Cetak Stiker Massal',
+                        'Pilih kode tertentu (mis. K-030, K-055) → satu PDF',
+                        () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const BulkStickerPage()));
+                    }),
+                    const SizedBox(height: 6),
+                    _actionTile(
+                        context,
+                        Icons.rule,
+                        'Cek Kode Inventaris Ganda',
+                        'Temukan perangkat yang memakai kode sama',
+                        () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const KodeGandaPage()));
+                    }),
                   ],
                 ),
                 const SizedBox(height: 20),

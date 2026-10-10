@@ -5,6 +5,7 @@ import '../models/device.dart';
 import '../theme/app_theme.dart';
 import '../utils/field_groups.dart';
 import '../widgets/clickable.dart';
+import 'detail_page.dart';
 
 class DeviceFormPage extends StatefulWidget {
   final Device? device;
@@ -168,6 +169,15 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Cegah kode ganda: kode dianggap sama walau beda format (K-035 = K-0035).
+    final bentrok =
+        _db.kodeDipakaiLain(_kode.text.trim(), excludeId: widget.device?.id);
+    if (bentrok != null) {
+      await _tampilkanKodeGanda(bentrok);
+      return;
+    }
+
     final d = Device(
       id: widget.device?.id,
       kodeInventaris: _kode.text.trim(),
@@ -199,6 +209,85 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_isEdit ? 'Data diperbarui' : 'Data ditambahkan')));
     Navigator.pop(context, true);
+  }
+
+  /// Dialog peringatan kode inventaris sudah dipakai perangkat lain — simpan
+  /// dibatalkan supaya data tidak ganda.
+  Future<void> _tampilkanKodeGanda(Device pemilik) async {
+    final c = context.appColors;
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: c.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        icon: Icon(Icons.warning_amber_rounded, color: c.danger, size: 34),
+        title: Text('Kode sudah dipakai',
+            style: TextStyle(color: c.textPrimary, fontSize: 17)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Kode inventaris "${_kode.text.trim()}" sudah dipakai oleh:',
+              style: TextStyle(color: c.textPrimary, fontSize: 13),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: c.surfaceAlt,
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(color: c.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(pemilik.kodeInventaris,
+                      style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1)),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${display(pemilik.deviceName)}'
+                    '${pemilik.bagian.trim().isNotEmpty ? ' · ${display(pemilik.bagian)}' : ''}',
+                    style: TextStyle(color: c.textMuted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Simpan dibatalkan. Ganti kode atau selesaikan duplikat '
+              'melalui menu Cek Kode Ganda di Pengaturan.',
+              style: TextStyle(color: c.textMuted, fontSize: 12, height: 1.4),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Tutup', style: TextStyle(color: c.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => DetailPage(device: pemilik)),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: c.blue,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Buka detail'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

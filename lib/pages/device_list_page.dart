@@ -10,6 +10,7 @@ import '../widgets/app_popup_menu.dart';
 import '../widgets/clickable.dart';
 import '../widgets/export_sheet.dart';
 import 'category_picker_page.dart';
+import 'bulk_sticker_page.dart';
 import 'detail_page.dart';
 import 'device_form_page.dart';
 import 'scan_page.dart';
@@ -136,6 +137,14 @@ class _DeviceListPageState extends State<DeviceListPage> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ScanPage()),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Cetak Stiker Massal',
+            icon: const Icon(Icons.sticky_note_2_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BulkStickerPage()),
             ),
           ),
                     IconButton(

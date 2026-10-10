@@ -11,6 +11,7 @@ import '../models/device.dart';
 import '../services/pin_controller.dart';
 import '../utils/device_diff.dart';
 import '../utils/kode_generator.dart';
+import '../utils/kode_normalizer.dart';
 import 'local_database.dart';
 
 /// Hasil operasi hapus master (Bagian/PLAN).
@@ -363,6 +364,36 @@ class DbHelper extends ChangeNotifier {
   Device? _cariDiCacheById(int id) {
     final byId = _devices.where((x) => x.id == id).toList();
     return byId.isEmpty ? null : byId.first;
+  }
+
+  /// Perangkat LAIN (selain [excludeId]) yang memakai kode yang sama.
+  ///
+  /// Perbandingan memakai [canonicalKode] sehingga "K-0035" dianggap sama
+  /// dengan "K-035". Mengembalikan perangkat pemilik kode, atau null bila
+  /// belum ada yang memakainya. Dipakai untuk mencegah kode ganda saat simpan.
+  Device? kodeDipakaiLain(String kode, {int? excludeId}) {
+    final key = canonicalKode(kode);
+    if (key.isEmpty) return null;
+    for (final d in _devices) {
+      if (d.id != null && d.id == excludeId) continue;
+      if (canonicalKode(d.kodeInventaris) == key) return d;
+    }
+    return null;
+  }
+
+  /// Kelompok perangkat yang memakai kode sama (>= 2) untuk halaman
+  /// "Cek Kode Ganda". Tiap grup = daftar perangkat dengan kode kanonik sama.
+  List<List<Device>> temukanKodeGanda() {
+    final map = <String, List<Device>>{};
+    for (final d in _devices) {
+      final key = canonicalKode(d.kodeInventaris);
+      if (key.isEmpty) continue;
+      map.putIfAbsent(key, () => <Device>[]).add(d);
+    }
+    final hasil = map.values.where((g) => g.length > 1).toList()
+      ..sort((a, b) => canonicalKode(a.first.kodeInventaris)
+          .compareTo(canonicalKode(b.first.kodeInventaris)));
+    return hasil;
   }
 
   void _logPerubahan(Device? lama, Device d) {
