@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../utils/field_groups.dart';
 import '../widgets/app_popup_menu.dart';
 import '../widgets/clickable.dart';
+import '../widgets/export_sheet.dart';
 import 'category_picker_page.dart';
 import 'detail_page.dart';
 import 'device_form_page.dart';
@@ -23,6 +24,7 @@ class DeviceListPage extends StatefulWidget {
 
 class _DeviceListPageState extends State<DeviceListPage> {
   final DbHelper _db = DbHelper.instance;
+  final TextEditingController _searchController = TextEditingController();
 
   List<Device> _all = [];
   List<Device> _filtered = [];
@@ -46,6 +48,7 @@ class _DeviceListPageState extends State<DeviceListPage> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     _db.removeListener(_onDbChanged);
     super.dispose();
   }
@@ -77,14 +80,39 @@ class _DeviceListPageState extends State<DeviceListPage> {
   void _applyFilter() {
     final q = _query.trim().toLowerCase();
     _filtered = _all.where((d) {
-      final matchQ = q.isEmpty ||
-          d.kodeInventaris.toLowerCase().contains(q) ||
-          d.deviceName.toLowerCase().contains(q);
+      final matchQ = q.isEmpty || _matchQuery(d, q);
       final matchBagian = _filterBagian.isEmpty || d.bagian == _filterBagian;
       final matchCat = _filterCategory.isEmpty ||
           categoryKey(d.category) == _filterCategory;
       return matchQ && matchBagian && matchCat;
     }).toList();
+  }
+
+  /// Pencarian teks lintas kolom penting: kode, nama, bagian, plan, dan
+  /// spesifikasi (prosesor, RAM, storage, OS) + status stiker/upgrade.
+  bool _matchQuery(Device d, String q) {
+    bool c(String? v) => v != null && v.toLowerCase().contains(q);
+    return c(d.kodeInventaris) ||
+        c(d.deviceName) ||
+        c(d.bagian) ||
+        c(d.plan) ||
+        c(d.prosesor) ||
+        c(d.ram) ||
+        c(d.storage) ||
+        c(d.osWindows) ||
+        c(d.keterangan) ||
+        c(d.statusUpgrade) ||
+        c(d.statusStiker) ||
+        c(categoryKey(d.category));
+  }
+
+  /// Deskripsi filter aktif untuk judul/label ekspor.
+  String get _filterCaption {
+    final parts = <String>[];
+    if (_filterCategory.isNotEmpty) parts.add(_filterCategory);
+    if (_filterBagian.isNotEmpty) parts.add('Bagian $_filterBagian');
+    if (_query.trim().isNotEmpty) parts.add('Cari "${_query.trim()}"');
+    return parts.isEmpty ? 'Semua data' : parts.join(' · ');
   }
 
   @override
@@ -200,11 +228,25 @@ class _DeviceListPageState extends State<DeviceListPage> {
               _query = v;
               _applyFilter();
             }),
+            controller: _searchController,
             style: TextStyle(color: c.textPrimary),
             decoration: InputDecoration(
-              hintText: 'Cari Kode / Nama device...',
+              hintText: 'Cari Kode / Nama / Bagian / Spesifikasi...',
               hintStyle: TextStyle(color: c.inputHint),
               prefixIcon: Icon(Icons.search, color: c.textMuted),
+              suffixIcon: _query.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Bersihkan pencarian',
+                      icon: Icon(Icons.clear, color: c.textMuted),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _query = '';
+                          _applyFilter();
+                        });
+                      },
+                    ),
               filled: true,
               fillColor: c.surface,
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -275,6 +317,22 @@ class _DeviceListPageState extends State<DeviceListPage> {
                   '${_filtered.length}/${_all.length}',
                   style: TextStyle(
                       color: c.accent, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Clickable(
+                child: IconButton(
+                  tooltip: 'Ekspor hasil filter',
+                  icon: Icon(Icons.file_download_outlined,
+                      color: _filtered.isEmpty ? c.inputHint : c.blue),
+                  onPressed: _filtered.isEmpty
+                      ? null
+                      : () => showExportSheet(
+                            context,
+                            devices: _filtered,
+                            title: 'Ekspor Hasil Filter',
+                            subtitle: _filterCaption,
+                          ),
                 ),
               ),
             ],

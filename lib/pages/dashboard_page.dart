@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../utils/field_groups.dart';
 import '../widgets/app_popup_menu.dart';
 import '../widgets/clickable.dart';
+import '../widgets/export_sheet.dart';
 import 'category_picker_page.dart';
 import 'device_form_page.dart';
 import 'scan_page.dart';
@@ -143,6 +144,15 @@ class _DashboardPageState extends State<DashboardPage> {
     }).toList();
   }
 
+  /// Deskripsi filter aktif untuk judul/label ekspor.
+  String get _filterCaption {
+    final parts = <String>[];
+    if (_filterKategori.isNotEmpty) parts.add(_filterKategori);
+    if (_filterBagian.isNotEmpty) parts.add('Bagian $_filterBagian');
+    if (_filterPlan.isNotEmpty) parts.add('PLAN $_filterPlan');
+    return parts.isEmpty ? 'Semua data' : parts.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
@@ -245,6 +255,21 @@ class _DashboardPageState extends State<DashboardPage> {
                           style: TextStyle(color: c.textMuted, fontSize: 11.5)),
                     ],
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Ekspor hasil filter',
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(Icons.file_download_outlined,
+                      color: _filtered.isEmpty ? c.inputHint : c.blue,
+                      size: 20),
+                  onPressed: _filtered.isEmpty
+                      ? null
+                      : () => showExportSheet(
+                            context,
+                            devices: List.of(_filtered),
+                            title: 'Ekspor Data Dashboard',
+                            subtitle: _filterCaption,
+                          ),
                 ),
                 Icon(Icons.chevron_right, color: c.textMuted, size: 20),
               ],

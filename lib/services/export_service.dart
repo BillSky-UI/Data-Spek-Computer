@@ -133,9 +133,10 @@ class ExportService {
     return map;
   }
 
-  Future<SavedTarget> saveExcelToDownloads(List<Device> devices) async {
+  Future<SavedTarget> saveExcelToDownloads(List<Device> devices,
+      {String prefix = 'Spek_Inventaris_DPR'}) async {
     final bytes = await buildExcelBytesAsync(devices);
-    final name = 'Spek_Inventaris_DPR_${_timestamp()}.xlsx';
+    final name = '${_sanitize(prefix)}_${_timestamp()}.xlsx';
     return PublicSaverService.instance.saveFileToDownloads(
       bytes,
       name,
@@ -144,11 +145,18 @@ class ExportService {
   }
 
   /// Simpan file .csv ke folder Download publik HP (MediaStore).
-  Future<SavedTarget> saveCsvToDownloads(List<Device> devices) async {
+  Future<SavedTarget> saveCsvToDownloads(List<Device> devices,
+      {String prefix = 'Spek_Inventaris_DPR'}) async {
     final bytes = await compute(_buildCsv, devices);
-    final name = 'Spek_Inventaris_DPR_${_timestamp()}.csv';
+    final name = '${_sanitize(prefix)}_${_timestamp()}.csv';
     return PublicSaverService.instance.saveFileToDownloads(
         bytes, name, 'text/csv');
+  }
+
+  /// Buang karakter yang tidak aman untuk nama file.
+  static String _sanitize(String s) {
+    final bersih = s.trim().replaceAll(RegExp(r'[^A-Za-z0-9_\-]+'), '_');
+    return bersih.isEmpty ? 'Spek_Inventaris_DPR' : bersih;
   }
 
   /// Versi async [buildExcelBytes] yang jalan di isolate latar.
